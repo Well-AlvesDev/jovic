@@ -25,7 +25,7 @@ export default {
     storeBio: { type: String, default: '' },
     isOpen: { type: Boolean, default: true },
     instagramUrl: { type: String, default: '' },
-    whatsappNumber: { type: String, default: '' },
+    whatsappNumber: { type: String, default: '5581989870791' },
     paymentLogos: { type: Array, default: () => [] },
   },
 
@@ -39,7 +39,7 @@ export default {
     // ── Computed ─────────────────────────────────────────────────
     const whatsappLink = computed(() => {
       const text = encodeURIComponent(`Olá! Vim pelo link da loja ${props.storeName}.`);
-      return `https://wa.me/5581993609366?text=${text}`;
+      return `https://wa.me/${props.whatsappNumber}?text=${text}`;
     });
 
     const formattedInstagramUrl = computed(() => {
