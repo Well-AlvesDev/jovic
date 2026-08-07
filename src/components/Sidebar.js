@@ -135,8 +135,8 @@ export default {
 
         <!-- Footer -->
         <div class="sidebar-footer">
-     <img src="./src/assets/images/static/SVLO.webp" alt="sVLO Logo" style="width: 50px;" />
-          <p style="text-decoration: underline; cursor: pointer;">sVLO - V1.0</p> 
+     <img src="./src/assets/images/profile/logo.webp" alt="sVLO Logo" style="width: 30px;" />
+          <p style=" cursor: pointer;">USE JOVIC</p> 
         </div>
         
       </nav>
