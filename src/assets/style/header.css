@@ -1,0 +1,164 @@
+/* ══════════════════════════════════════════════
+   HEADER COMPONENT
+══════════════════════════════════════════════ */
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.786);
+    backdrop-filter: blur(4px);
+    box-shadow: var(--shadow-header);
+}
+
+.header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 16px;
+    max-width: 720px;
+    margin: 0 auto;
+    height: 70px;
+    width: 100%;
+}
+
+/* Icon Button */
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    font-size: 24px;
+    color: white;
+}
+
+/* Menu toggle: icon + label */
+.menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: none;
+    border: none;
+    color: rgb(26, 26, 26);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    min-width: 40px;
+    height: 40px;
+}
+
+.menu-toggle i {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.menu-toggle .menu-label {
+    font-size: 14px;
+    color: rgb(50, 50, 50);
+    text-transform: capitalize;
+}
+
+.menu-toggle:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* Header Center - Logo */
+.header-center {
+    flex: 1;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Cart Button */
+.cart-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    background: none;
+    border: none;
+    color: rgb(26, 26, 26);
+    font-size: 24px;
+    cursor: pointer;
+    transition: background var(--transition);
+}
+
+.cart-button:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* Cart Count Badge */
+.cart-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: var(--radius-full);
+    background: var(--brand-orange);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+
+/* Store Logo Header */
+.store-logo-header {
+    height: 40px;
+    object-fit: contain;
+    border-radius: 15px;
+}
+
+/* Cart Button */
+.cart-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    background: var(--bg-page);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: background var(--transition);
+}
+
+.cart-btn:hover {
+    background: #e6e6e6;
+}
+
+.cart-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    font-size: 22px;
+}
+
+.cart-badge {
+    position: absolute;
+    top: -6px;
+    right: -7px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--brand-orange);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+}

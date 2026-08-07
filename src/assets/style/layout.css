@@ -1,0 +1,18 @@
+/* ══════════════════════════════════════════════
+   LAYOUT STRUCTURE
+══════════════════════════════════════════════ */
+.page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+}
+
+.main {
+    flex: 1;
+}
+
+.container {
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
+}

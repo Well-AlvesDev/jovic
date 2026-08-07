@@ -1,0 +1,39 @@
+/* ══════════════════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════════════════ */
+:root {
+    /* Colors */
+    --brand-orange: #F5A623;
+    --brand-dark: #0D0D0D;
+    --brand-green: #28A745;
+    --brand-green-dark: #1e8035;
+    --bg-page: #F2F2F2;
+    --bg-surface: #FFFFFF;
+    --bg-strip: #0D0D0D;
+    --text-primary: #1A1A1A;
+    --text-secondary: #555555;
+    --text-muted: #999999;
+    --text-on-dark: #FFFFFF;
+    --border: #E5E5E5;
+    --whatsapp: #25D366;
+
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+
+    /* Border Radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-full: 999px;
+
+    /* Shadows */
+    --shadow-card: 0 2px 12px rgba(0, 0, 0, .08);
+    --shadow-header: 0 1px 6px rgba(0, 0, 0, .12);
+
+    /* Typography */
+    --font: 'Inter', system-ui, sans-serif;
+    --transition: 0.2s ease;
+}

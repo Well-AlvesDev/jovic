@@ -1,0 +1,5190 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo</title>
+    <link rel="icon" type="image/svg" href="./recursos/identidade/logo.svg">
+    <link rel="shortcut icon" href="./recursos/identidade/logo.svg">
+    <link rel="apple-touch-icon" href="./recursos/identidade/logo.svg">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.26.0"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css">
+    <script>
+        // Registrar Service Worker para cache de imagens (5 horas)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./src/service-worker.js', { scope: '/' })
+                .then((reg) => console.log('✅ Service Worker registrado para cache de imagens'))
+                .catch((err) => console.log('Service Worker registration failed:', err));
+        }
+    </script>
+    <script src="./src/config.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --blue: #1d63d3;
+            --blue-dark: #1550b8;
+            --blue-light: #eef2ff;
+            --text: #1a1d23;
+            --muted: #6b7280;
+            --border: #e8eaed;
+            --surface: #f7f8fa;
+            --white: #ffffff;
+            --danger: #e53935;
+            --success: #16a34a;
+            --radius: 10px;
+            --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        body {
+            font-family: 'DM Sans', Arial, sans-serif;
+            background: var(--surface);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── TOPBAR ── */
+        .navbar {
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 56px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar-logo-dot {
+            width: 28px;
+            height: 28px;
+            background: var(--blue);
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .navbar h1 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.01em;
+        }
+
+        .navbar-divider {
+            width: 1px;
+            height: 18px;
+            background: var(--border);
+        }
+
+
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .online-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s ease infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(0.85);
+            }
+        }
+
+        .btn-logout {
+            padding: 6px 14px;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-family: 'DM Sans', Arial, sans-serif;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-logout:hover {
+            background: #fff0f0;
+            color: var(--danger);
+            border-color: #fca5a5;
+        }
+
+        /* ── HIDE old user-section ── */
+        .user-section {
+            display: none;
+        }
+
+        /* ── PAGE SHELL ── */
+        .page-shell {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 32px 20px 60px;
+        }
+
+        /* ── SITE HEADER ── */
+        .site-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 28px;
+            padding: 20px 24px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .site-header-logo {
+            width: 52px;
+            height: 52px;
+            border-radius: 10px;
+            object-fit: contain;
+            flex-shrink: 0;
+            border: 1px solid var(--border);
+            padding: 4px;
+            background: var(--white);
+        }
+
+        .site-header-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .site-header-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 2px;
+        }
+
+        .site-header-name {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 3px;
+        }
+
+        .site-header-url a {
+            font-size: 0.78rem;
+            color: var(--blue);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: 'DM Mono', monospace;
+            opacity: 0.85;
+        }
+
+        .site-header-url a:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
+        .site-header-back {
+            padding: 7px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            font-family: 'DM Sans', Arial, sans-serif;
+        }
+
+        .site-header-back:hover {
+            background: var(--blue-light);
+            color: var(--blue);
+            border-color: #c7d7f8;
+        }
+
+        /* ── WELCOME CARD ── */
+        .welcome-card {
+            background: linear-gradient(135deg, rgb(184, 106, 137) 0%, #8e2f6690 60%, #e04a798e 100%);
+            border-radius: var(--radius);
+            padding: 28px 28px 24px;
+            color: white;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(29, 99, 211, 0.25);
+        }
+
+        .welcome-card::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            width: 160px;
+            height: 160px;
+            background: rgba(255, 255, 255, 0.07);
+            border-radius: 50%;
+        }
+
+        .welcome-card::after {
+            content: '';
+            position: absolute;
+            bottom: -60px;
+            right: 60px;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+
+        .welcome-greeting {
+            font-size: 0.75rem;
+            font-weight: 500;
+            opacity: 0.75;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+        }
+
+        .welcome-card h2 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+            position: relative;
+        }
+
+        .welcome-card p {
+            font-size: 0.83rem;
+            opacity: 0.75;
+            line-height: 1.5;
+            max-width: 420px;
+            position: relative;
+        }
+
+        .welcome-card-icon {
+            position: absolute;
+            right: 28px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 52px;
+            opacity: 0.12;
+        }
+
+        /* ── ACTION CARDS ── */
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .action-card {
+            background: var(--white);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            transition: all 0.18s ease;
+            text-align: left;
+            font-family: 'DM Sans', Arial, sans-serif;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .action-card:hover {
+            border-color: var(--blue);
+            box-shadow: 0 4px 16px rgba(29, 99, 211, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .action-card:active {
+            transform: translateY(0);
+        }
+
+        .action-card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .action-card-icon.blue {
+            background: var(--blue-light);
+            color: var(--blue);
+        }
+
+        .action-card-icon.orange {
+            background: #fff7ed;
+            color: #ea580c;
+        }
+
+        .action-card-body {
+            min-width: 0;
+        }
+
+        .action-card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 3px;
+        }
+
+        .action-card-desc {
+            font-size: 0.76rem;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        /* Badge de notificação para pedidos pendentes */
+        .orders-notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ea580c;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border: 2px solid var(--white);
+            box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+            animation: badgePulse 2s ease infinite;
+        }
+
+        @keyframes badgePulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+            }
+
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 4px 12px rgba(234, 88, 12, 0.5);
+            }
+        }
+
+        .orders-notification-badge.hidden {
+            display: none;
+        }
+
+        /* Filtro de pedidos abaixo do cabeçalho do modal */
+        .orders-filter-bar {
+            padding: 10px 24px;
+            border-bottom: 1px solid var(--modal-border);
+            background: var(--modal-surface);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .orders-filter-bar label {
+            color: var(--modal-muted);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .orders-filter-bar #filterDropdown {
+            display: inline-block;
+            flex: 1;
+            min-width: 150px;
+            max-width: 300px;
+        }
+
+        @media (max-width: 640px) {
+            .orders-filter-bar {
+                padding: 12px 16px;
+                gap: 10px;
+            }
+
+            .orders-filter-bar label {
+                font-size: 0.85rem;
+            }
+
+            .orders-filter-bar #filterDropdown {
+                min-width: 140px;
+                max-width: 100%;
+            }
+        }
+
+        .orders-filter {
+            padding: 6px 10px;
+            border: 1px solid var(--modal-border);
+            background: white;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--modal-text);
+        }
+
+        /* ── INFO STRIP ── */
+        .info-strip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.78rem;
+            color: var(--muted);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .info-strip i {
+            color: var(--blue);
+        }
+
+        /* ── USER BADGE in navbar ── */
+        .navbar-user-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px 5px 6px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--surface);
+        }
+
+        .navbar-avatar {
+            width: 22px;
+            height: 22px;
+            background: var(--blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: white;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .user-email {
+            font-size: 0.78rem;
+            color: var(--text);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 140px;
+        }
+
+        /* Versão abreviada do email (nome até @) */
+        .user-email-short {
+            display: none;
+        }
+
+        /* Versão com iniciais */
+        .user-email-initials {
+            display: none;
+        }
+
+        /* ── RESPONSIVIDADE NAVBAR ── */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0 16px;
+                gap: 8px;
+            }
+
+            .navbar h1 {
+                font-size: 0.85rem;
+            }
+
+            .navbar-divider {
+                display: none;
+            }
+
+            .online-status {
+                display: none;
+            }
+
+            .user-email {
+                max-width: 100px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .navbar-right {
+                gap: 8px;
+            }
+
+            .user-email {
+                display: none;
+            }
+
+            .user-email-short {
+                display: block;
+                max-width: 80px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .btn-logout {
+                padding: 6px 10px;
+                font-size: 0.75rem;
+            }
+
+            .btn-logout i {
+                display: none;
+            }
+
+            .user-email-short {
+                display: none;
+            }
+
+            .user-email-initials {
+                display: block;
+                font-weight: 600;
+                min-width: 18px;
+                text-align: center;
+            }
+
+            .navbar-user-badge {
+                padding: 4px 8px;
+            }
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 32px auto;
+            padding: 0 20px;
+        }
+
+        /* legacy compat */
+        .welcome-box {
+            display: none;
+        }
+
+        .btn-publish-product {
+            display: none;
+        }
+
+        .breadcrumb-nav,
+        .site-url {
+            display: none;
+        }
+
+        /* ===== MODAL SYSTEM — redesigned ===== */
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+        :root {
+            --modal-bg: #ffffff;
+            --modal-surface: #f7f8fa;
+            --modal-border: #e8eaed;
+            --modal-accent: #1d63d3;
+            --modal-accent-light: #eef2ff;
+            --modal-danger: #e53935;
+            --modal-danger-light: #fff5f5;
+            --modal-success: #1a8a4a;
+            --modal-text: #1a1d23;
+            --modal-muted: #6b7280;
+            --modal-input-bg: #f9fafb;
+            --modal-shadow: 0 8px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --transition: 0.18s ease;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background: rgba(15, 20, 35, 0.55);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            animation: modalFadeIn 0.22s ease;
+            /* flex centering so modal-content never overflows viewport */
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(16px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-content {
+            background: var(--modal-bg);
+            position: relative;
+            padding: 0;
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 620px;
+            box-shadow: var(--modal-shadow);
+            /* key: height is bounded by the flex container (viewport - padding) */
+            max-height: calc(100vh - 32px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: modalSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            font-family: 'DM Sans', Arial, sans-serif;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px 18px;
+            border-bottom: 1px solid var(--modal-border);
+            background: var(--modal-bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .modal-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--modal-accent-light);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--modal-accent);
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .modal-header h2 {
+            color: var(--modal-text);
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .modal-header p.modal-subtitle {
+            color: var(--modal-muted);
+            font-size: 0.78rem;
+            margin: 1px 0 0;
+            font-weight: 400;
+        }
+
+        .close-btn {
+            background: var(--modal-surface);
+            border: 1px solid var(--modal-border);
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--modal-muted);
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .close-btn:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+            color: var(--modal-danger);
+        }
+
+        /* Modal scrollable body */
+        .modal-body {
+            padding: 22px 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* form inside modal-content must also be a flex column so footer is always visible */
+        .modal-content>form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--modal-border);
+            background: var(--modal-surface);
+            flex-shrink: 0;
+        }
+
+        /* ---- Form groups ---- */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--modal-text);
+            font-weight: 500;
+            font-size: 0.83rem;
+            letter-spacing: 0.01em;
+        }
+
+        .form-group label .required-star {
+            color: var(--modal-danger);
+            margin-left: 2px;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1.5px solid var(--modal-border);
+            border-radius: var(--radius-sm);
+            font-family: 'DM Sans', Arial, sans-serif;
+            font-size: 0.9rem;
+            color: var(--modal-text);
+            background: var(--modal-input-bg);
+            transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+            outline: none;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group input[type="number"]:focus,
+        .form-group textarea:focus {
+            border-color: var(--modal-accent);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(29, 99, 211, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+            line-height: 1.5;
+        }
+
+        /* Custom file upload */
+        .file-upload-zone {
+            border: 2px dashed var(--modal-border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition);
+            background: var(--modal-surface);
+            position: relative;
+        }
+
+        /* Single publish drop zone will be used (carousel handles multiple images) */
+
+        .file-upload-zone:hover,
+        .file-upload-zone.drag-over {
+            border-color: var(--modal-accent);
+            background: var(--modal-accent-light);
+        }
+
+        .file-upload-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .file-upload-icon {
+            font-size: 26px;
+            color: var(--modal-muted);
+            margin-bottom: 6px;
+        }
+
+        .file-upload-text {
+            font-size: 0.83rem;
+            color: var(--modal-muted);
+            font-weight: 400;
+        }
+
+        .file-upload-text strong {
+            color: var(--modal-accent);
+            font-weight: 600;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-row.full {
+            grid-template-columns: 1fr;
+        }
+
+        /* Image preview */
+        .image-preview-container {
+            position: relative;
+            width: 100%;
+            margin-top: 10px;
+            display: none;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            border: 1.5px solid var(--modal-border);
+            max-width: 160px;
+        }
+
+        .image-preview {
+            width: 100%;
+            display: block;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+
+        .remove-image-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(0, 0, 0, 0.65);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 26px;
+            height: 26px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background var(--transition);
+            backdrop-filter: blur(4px);
+        }
+
+        .remove-image-btn:hover {
+            background: var(--modal-danger);
+        }
+
+        /* Multi-image carousel for product publish */
+        .images-carousel {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            position: relative;
+        }
+
+        .images-track {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 6px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .image-item {
+            flex: 0 0 auto;
+            width: 120px;
+            height: 120px;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            position: relative;
+            border: 1.5px solid var(--modal-border);
+            background: var(--modal-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+            user-select: none;
+        }
+
+        .image-item:active {
+            cursor: grabbing;
+        }
+
+        .image-item.dragging {
+            opacity: 0.7;
+            transform: scale(1.05);
+            box-shadow: 0 8px 24px rgba(29, 99, 211, 0.3);
+            z-index: 100;
+        }
+
+        .image-item.drag-over {
+            border-color: var(--modal-accent);
+            background: var(--modal-accent-light);
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            pointer-events: none;
+        }
+
+        .carousel-nav {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: var(--modal-surface);
+            border: 1px solid var(--modal-border);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .carousel-nav i {
+            font-size: 18px;
+            color: var(--modal-accent);
+        }
+
+        /* Availability toggle */
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: var(--modal-surface);
+            border: 1.5px solid var(--modal-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+
+        .toggle-label-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .toggle-label-text span:first-child {
+            font-size: 0.87rem;
+            font-weight: 500;
+            color: var(--modal-text);
+        }
+
+        .toggle-label-text span:last-child {
+            font-size: 0.76rem;
+            color: var(--modal-muted);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 42px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: #d1d5db;
+            border-radius: 100px;
+            transition: background var(--transition);
+            cursor: pointer;
+        }
+
+        .toggle-track::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform var(--transition);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch input:checked+.toggle-track {
+            background: var(--success);
+        }
+
+        .toggle-switch input:checked+.toggle-track::after {
+            transform: translateX(18px);
+        }
+
+        /* Buttons */
+        .form-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .form-actions .spacer {
+            flex: 1;
+        }
+
+        .btn-cancel,
+        .btn-submit,
+        .btn-edit,
+        .btn-delete {
+            padding: 9px 18px;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.87rem;
+            font-weight: 500;
+            font-family: 'DM Sans', Arial, sans-serif;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-cancel {
+            background: var(--modal-surface);
+            color: var(--modal-muted);
+            border: 1.5px solid var(--modal-border);
+        }
+
+        .btn-cancel:hover {
+            background: #f0f0f0;
+            color: var(--modal-text);
+        }
+
+        .btn-submit {
+            background: var(--modal-accent);
+            color: white;
+            box-shadow: 0 2px 8px rgba(29, 99, 211, 0.25);
+        }
+
+        .btn-submit:hover {
+            background: #1550b8;
+            box-shadow: 0 4px 12px rgba(29, 99, 211, 0.35);
+            transform: translateY(-1px);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .btn-edit {
+            background: var(--modal-accent);
+            color: white;
+            flex: 1;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(29, 99, 211, 0.2);
+        }
+
+        .btn-edit:hover {
+            background: #1550b8;
+        }
+
+        .btn-delete {
+            background: var(--modal-danger-light);
+            color: var(--modal-danger);
+            border: 1.5px solid #fca5a5;
+        }
+
+        .btn-delete:hover {
+            background: var(--modal-danger);
+            color: white;
+            border-color: var(--modal-danger);
+        }
+
+        .btn-delete:disabled,
+        .btn-edit:disabled,
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Error messages */
+        .error-message {
+            color: var(--modal-danger);
+            font-size: 0.78rem;
+            margin-top: 4px;
+            display: none;
+            align-items: center;
+            gap: 4px;
+        }
+
+        input:invalid {
+            border-color: var(--modal-danger);
+        }
+
+        /* ===== MANAGE MODAL ===== */
+        .search-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 9px 12px 9px 36px;
+            border: 1.5px solid var(--modal-border);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            font-family: 'DM Sans', Arial, sans-serif;
+            background: var(--modal-input-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") 11px center no-repeat;
+            outline: none;
+            color: var(--modal-text);
+            transition: border-color var(--transition), box-shadow var(--transition);
+        }
+
+        .search-input:focus {
+            border-color: var(--modal-accent);
+            box-shadow: 0 0 0 3px rgba(29, 99, 211, 0.1);
+            background-color: white;
+        }
+
+        .search-button {
+            padding: 9px 18px;
+            background: var(--modal-accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.87rem;
+            font-weight: 500;
+            font-family: 'DM Sans', Arial, sans-serif;
+            transition: all var(--transition);
+            white-space: nowrap;
+        }
+
+        .search-button:hover {
+            background: #1550b8;
+        }
+
+        .search-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Products grid */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .product-card {
+            border: 1.5px solid var(--modal-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--modal-bg);
+            position: relative;
+        }
+
+        .product-card:hover {
+            border-color: var(--modal-accent);
+            box-shadow: 0 4px 16px rgba(29, 99, 211, 0.15);
+        }
+
+        .product-card.selected {
+            border-color: var(--modal-accent);
+            background: var(--modal-accent-light);
+            box-shadow: 0 0 0 3px rgba(29, 99, 211, 0.15);
+        }
+
+        .product-card.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 7px;
+            right: 7px;
+            background: var(--modal-accent);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .product-card-image {
+            width: 100%;
+            height: 110px;
+            object-fit: contain;
+            background: var(--modal-surface);
+            display: block;
+        }
+
+        .product-card-info {
+            padding: 8px 10px 10px;
+        }
+
+        .product-card-name {
+            font-weight: 600;
+            font-size: 0.78rem;
+            color: var(--modal-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .product-card-price {
+            color: rgb(21, 121, 29);
+            font-weight: 600;
+            font-size: 0.85rem;
+            font-family: 'DM Sans', Arial, sans-serif;
+        }
+
+        .product-card-original-price {
+            color: var(--muted);
+            font-weight: 400;
+            font-size: 0.75rem;
+            font-family: 'DM Sans', Arial, sans-serif;
+            text-decoration: line-through;
+            margin-bottom: 4px;
+        }
+
+        .product-card-discount-price {
+            color: rgb(21, 121, 29);
+            font-weight: 600;
+            font-size: 0.85rem;
+            font-family: 'DM Sans', Arial, sans-serif;
+        }
+
+        .product-card-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .badge-available {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-unavailable {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--modal-muted);
+            font-size: 0.9rem;
+        }
+
+        .no-results-icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        /* Selected product panel */
+        .selected-product-panel {
+            background: var(--modal-accent-light);
+            border: 1.5px solid rgba(29, 99, 211, 0.2);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .selected-product-panel.show {
+            display: flex;
+        }
+
+        .selected-product-thumb {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-sm);
+            object-fit: cover;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .selected-product-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .selected-product-info strong {
+            display: block;
+            font-size: 0.87rem;
+            color: var(--modal-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .selected-product-info span {
+            font-size: 0.78rem;
+            color: var(--modal-muted);
+        }
+
+        /* Current image in edit modal */
+        .current-product-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: var(--radius-sm);
+            border: 1.5px solid var(--modal-border);
+            display: none;
+        }
+
+        /* Section divider inside modal */
+        .form-section-title {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--modal-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 18px 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--modal-border);
+        }
+
+        /* ===== Model Badge Quantity Input ===== */
+        .model-badge input[type="number"] {
+            background: white;
+            color: var(--modal-text);
+            font-weight: 600;
+            border: 1px solid var(--modal-border) !important;
+            border-radius: 4px;
+            padding: 2px 4px !important;
+            height: 24px;
+            width: 40px;
+            text-align: center;
+            font-size: 0.8rem;
+            transition: border-color var(--transition), box-shadow var(--transition);
+        }
+
+        .model-badge input[type="number"]:focus {
+            border-color: var(--modal-accent) !important;
+            box-shadow: 0 0 0 2px rgba(29, 99, 211, 0.15) !important;
+            outline: none;
+        }
+
+        /* Remove spinner do número em navegadores Chrome/Safari */
+        .model-badge input[type="number"]::-webkit-outer-spin-button,
+        .model-badge input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Remove spinner do número em Firefox */
+        .model-badge input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* ===== success message ===== */
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 12px 14px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 14px;
+            display: none;
+            font-size: 0.87rem;
+            font-weight: 500;
+            border: 1px solid #a7f3d0;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .success-message.show {
+            display: flex;
+        }
+
+        .current-product-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .current-product-info.show {
+            display: block;
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        /* Loader overlay para modal */
+        .orders-loader {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: var(--radius-lg);
+            z-index: 20;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .orders-loader.show {
+            display: flex;
+        }
+
+        .orders-loader-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e8eaed;
+            border-top: 3px solid var(--modal-accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .orders-loader-text {
+            font-size: 0.9rem;
+            color: var(--modal-muted);
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .success-message {
+            background-color: #4caf50;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .current-product-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .current-product-info.show {
+            display: block;
+        }
+
+        .breadcrumb-nav {
+            text-align: center;
+            padding: 15px 0;
+            font-size: 0.95em;
+        }
+
+        .breadcrumb-nav a {
+            color: #1d63d3;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+            padding-bottom: 3px;
+        }
+
+        .breadcrumb-nav a:hover {
+            color: #244dff;
+            border-bottom-color: #244dff;
+        }
+
+        .breadcrumb-separator {
+            color: #999;
+            margin: 0 8px;
+        }
+
+        .site-url {
+            text-align: center;
+            margin-top: 10px;
+            color: #999;
+            font-size: 0.85em;
+            font-style: italic;
+        }
+
+        .site-url a {
+            color: #1d63d3;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .site-url a:hover {
+            color: #244dff;
+            text-decoration: underline;
+        }
+
+        /* ===== MODAL RESPONSIVIDADE ===== */
+
+        /* Tablet (≤ 640px) */
+        @media (max-width: 640px) {
+            .modal {
+                padding: 12px;
+                align-items: flex-end;
+                /* sobe do fundo como sheet */
+            }
+
+            .modal-content {
+                max-width: 100%;
+                width: 100%;
+                max-height: 92dvh;
+                border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+                animation: modalSlideUp 0.28s cubic-bezier(0.34, 1.3, 0.64, 1);
+            }
+
+            @keyframes modalSlideUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(40px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .modal-header {
+                padding: 16px 16px 14px;
+            }
+
+            .modal-body {
+                padding: 16px 16px;
+            }
+
+            .modal-footer {
+                padding: 12px 16px;
+                /* garante que fique acima do safe-area (notch) em iOS */
+                padding-bottom: max(12px, env(safe-area-inset-bottom));
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .form-actions .btn-cancel,
+            .form-actions .btn-submit,
+            .form-actions .btn-edit,
+            .form-actions .btn-delete {
+                flex: 1 1 calc(50% - 4px);
+                justify-content: center;
+                min-width: 0;
+            }
+
+            /* Spacer some modais usam para empurrar botão p/ direita — não faz sentido em mobile */
+            .form-actions .spacer {
+                display: none;
+            }
+
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 8px;
+            }
+
+            .product-card-image {
+                height: 90px;
+            }
+
+            .selected-product-panel {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+        }
+
+        /* Mobile pequeno (≤ 400px) */
+        @media (max-width: 400px) {
+            .modal {
+                padding: 0;
+            }
+
+            .modal-content {
+                max-height: 96dvh;
+                border-radius: 14px 14px 0 0;
+            }
+
+            .modal-header {
+                padding: 14px 14px 12px;
+            }
+
+            .modal-header h2 {
+                font-size: 0.92rem;
+            }
+
+            .modal-header p.modal-subtitle {
+                font-size: 0.72rem;
+            }
+
+            .modal-icon {
+                width: 30px;
+                height: 30px;
+                font-size: 14px;
+            }
+
+            .modal-body {
+                padding: 14px 14px;
+            }
+
+            .modal-footer {
+                padding: 10px 14px;
+                padding-bottom: max(10px, env(safe-area-inset-bottom));
+            }
+
+            .form-actions .btn-cancel,
+            .form-actions .btn-submit,
+            .form-actions .btn-edit,
+            .form-actions .btn-delete {
+                flex: 1 1 100%;
+                padding: 10px 14px;
+                font-size: 0.85rem;
+            }
+
+            .products-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .file-upload-zone {
+                padding: 16px 12px;
+            }
+
+            .file-upload-icon {
+                font-size: 22px;
+            }
+
+            .file-upload-text {
+                font-size: 0.78rem;
+            }
+
+            .search-container {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .search-button {
+                width: 100%;
+                padding: 9px;
+            }
+        }
+
+        /* Adiciona handle visual no topo do modal em mobile (sheet drag hint) */
+        @media (max-width: 640px) {
+            .modal-content::before {
+                content: '';
+                display: block;
+                width: 36px;
+                height: 4px;
+                background: var(--modal-border);
+                border-radius: 2px;
+                margin: 10px auto 0;
+                flex-shrink: 0;
+            }
+        }
+
+        /* ===== COLLAPSIBLE ORDERS ===== */
+        .order-card {
+            border: 1.5px solid var(--modal-border);
+            border-radius: var(--radius-md);
+            margin-bottom: 10px;
+            overflow: hidden;
+            background: var(--modal-bg);
+            transition: all 0.2s ease;
+        }
+
+        .order-card.viewed {
+            opacity: 0.7;
+            background-color: #f0f0f0;
+        }
+
+        .order-card.completed {
+            border-color: #16a34a;
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s ease;
+            background: var(--modal-bg);
+        }
+
+        .order-header:hover {
+            background: var(--modal-surface);
+        }
+
+        .order-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .order-toggle-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--modal-accent);
+            font-size: 16px;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .order-card.expanded .order-toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .order-summary {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .order-id-badge {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--modal-text);
+            white-space: nowrap;
+        }
+
+        .order-client-name {
+            font-size: 0.85rem;
+            color: var(--modal-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .order-header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .order-price {
+            font-weight: 600;
+            color: var(--modal-accent);
+            font-size: 0.9rem;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .order-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+            border-top: 1px solid var(--modal-border);
+        }
+
+        .order-card.expanded .order-content {
+            max-height: 1000px;
+        }
+
+        .order-content-inner {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .order-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .order-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--modal-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .order-products {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .order-product-item {
+            font-size: 0.9rem;
+            color: var(--modal-text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .order-product-name {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .order-product-meta {
+            font-size: 0.75rem;
+            color: var(--modal-muted);
+            white-space: nowrap;
+            margin-left: 8px;
+        }
+
+        .order-info-row {
+            font-size: 0.87rem;
+            color: var(--modal-text);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .order-info-item {
+            display: flex;
+            gap: 4px;
+        }
+
+        .order-info-label {
+            font-weight: 500;
+            color: var(--modal-muted);
+        }
+
+        .order-info-value {
+            word-break: break-word;
+        }
+
+        @media (max-width: 640px) {
+            .order-header {
+                padding: 12px 12px;
+                gap: 8px;
+            }
+
+            .order-summary {
+                gap: 8px;
+            }
+
+            .order-price {
+                font-size: 0.85rem;
+                min-width: 70px;
+            }
+
+            .order-content-inner {
+                padding: 12px;
+                gap: 10px;
+            }
+
+            .order-info-row {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Toggle vertical para status dos pedidos */
+        .order-status-toggle {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .order-status-text {
+            font-size: 0.73rem;
+            font-weight: 500;
+            color: var(--modal-text);
+            text-align: center;
+            white-space: nowrap;
+            height: 16px;
+            line-height: 16px;
+        }
+
+        /* Data e hora do pedido */
+        .order-datetime {
+            font-size: 0.75rem;
+            color: var(--modal-muted);
+            text-align: right;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--modal-border);
+        }
+
+        /* Tabelas para visualização de pedido (produtos + informações do cliente) */
+        .order-products-table,
+        .order-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            background: var(--modal-bg);
+        }
+
+        .order-products-table th,
+        .order-products-table td,
+        .order-info-table td {
+            border: 1px solid var(--modal-border);
+            padding: 8px 10px;
+            text-align: left;
+            color: #14528f;
+        }
+
+        .order-products-table th {
+            background: var(--modal-surface);
+            color: var(--modal-text);
+            font-weight: 600;
+        }
+
+        .order-products-table td:nth-child(3),
+        .order-info-table td.value {
+            text-align: right;
+        }
+
+        .order-info-table td.label {
+            width: 140px;
+            font-weight: 600;
+            color: var(--modal-muted);
+            background: var(--modal-surface);
+        }
+
+        @media (max-width: 640px) {
+
+            .order-products-table th,
+            .order-products-table td,
+            .order-info-table td {
+                padding: 8px 6px;
+                font-size: 0.88rem;
+            }
+
+            .order-info-table td.label {
+                width: 100px;
+            }
+        }
+
+        /* ===== CUSTOM DROPDOWN WITH VUE ===== */
+        .custom-dropdown {
+            position: relative;
+            display: inline-block;
+            width: auto;
+            font-family: 'DM Sans', Arial, sans-serif;
+        }
+
+        .dropdown-trigger {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1.5px solid var(--modal-border);
+            background: white;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--modal-text);
+            font-weight: 500;
+            transition: all var(--transition);
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .dropdown-trigger:hover {
+            border-color: var(--modal-accent);
+            background: var(--modal-input-bg);
+        }
+
+        .dropdown-trigger.active {
+            border-color: var(--modal-accent);
+            background: var(--modal-accent-light);
+            color: var(--modal-accent);
+        }
+
+        .dropdown-icon {
+            font-size: 14px;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .dropdown-trigger.active .dropdown-icon {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            background: white;
+            border: 1.5px solid var(--modal-border);
+            border-radius: var(--radius-sm);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+            min-width: 100%;
+            animation: dropdownSlideDown 0.15s ease;
+        }
+
+        @keyframes dropdownSlideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .dropdown-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--modal-text);
+            transition: all 0.1s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--modal-border);
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: var(--modal-surface);
+            color: var(--modal-accent);
+        }
+
+        .dropdown-item.selected {
+            background: var(--modal-accent-light);
+            color: var(--modal-accent);
+            font-weight: 600;
+        }
+
+        .dropdown-item.selected::before {
+            content: '✓';
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            margin-right: 4px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        /* Tablet responsividade para dropdown */
+        @media (max-width: 768px) and (min-width: 641px) {
+            .dropdown-trigger {
+                padding: 8px 12px;
+                font-size: 0.88rem;
+            }
+
+            .dropdown-menu {
+                position: absolute;
+                top: calc(100% + 6px);
+                left: 0;
+                width: auto;
+                min-width: 200px;
+                max-height: 300px;
+                overflow-y: auto;
+                z-index: 2000;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+                border-radius: var(--radius-md);
+                animation: dropdownSlideDown 0.15s ease;
+            }
+
+            .dropdown-item {
+                padding: 11px 15px;
+                font-size: 0.92rem;
+            }
+        }
+
+        /* Mobile responsividade para dropdown */
+        @media (max-width: 640px) {
+            .dropdown-trigger {
+                padding: 9px 12px;
+                font-size: 0.85rem;
+            }
+
+            .custom-dropdown {
+                width: 100%;
+                max-width: 100%;
+                position: relative;
+            }
+
+            .dropdown-menu {
+                position: absolute;
+                top: calc(100% + 6px);
+                left: 0;
+                right: auto;
+                width: auto;
+                min-width: 180px;
+                max-width: calc(100vw - 20px);
+                max-height: 250px;
+                overflow-y: auto;
+                z-index: 2000;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+                border-radius: var(--radius-md);
+                animation: dropdownSlideDown 0.15s ease;
+            }
+
+            .dropdown-item {
+                padding: 11px 14px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* ===== PAGINATION BAR ===== */
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 14px 24px;
+            border-top: 1px solid var(--modal-border);
+            border-bottom: 1px solid var(--modal-border);
+            background: var(--modal-surface);
+            flex-shrink: 0;
+        }
+
+        .pagination-btn {
+            padding: 8px 14px;
+            border: 1.5px solid var(--modal-border);
+            background: var(--modal-bg);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.87rem;
+            font-weight: 500;
+            font-family: 'DM Sans', Arial, sans-serif;
+            color: var(--modal-text);
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            border-color: var(--modal-accent);
+            background: var(--modal-accent-light);
+            color: var(--modal-accent);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            font-size: 0.9rem;
+            color: var(--modal-text);
+            font-weight: 500;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        @media (max-width: 640px) {
+            .pagination-bar {
+                padding: 12px 16px;
+                gap: 8px;
+            }
+
+            .pagination-btn {
+                padding: 6px 10px;
+                font-size: 0.78rem;
+            }
+
+            .pagination-info {
+                font-size: 0.78rem;
+            }
+        }
+
+        /* ===== REAUTH MODAL CUSTOM STYLES ===== */
+        .form-group input[type="email"],
+        .form-group input[type="password"] {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1.5px solid var(--modal-border);
+            border-radius: var(--radius-sm);
+            font-family: 'DM Sans', Arial, sans-serif;
+            font-size: 0.9rem;
+            color: var(--modal-text);
+            background: var(--modal-input-bg);
+            transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+            outline: none;
+        }
+
+        .form-group input[type="email"]:focus,
+        .form-group input[type="password"]:focus {
+            border-color: var(--modal-accent);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(29, 99, 211, 0.1);
+        }
+
+        #reauthForm>.modal-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        #reauthForm .btn-submit {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        /* ===== REAUTH SUCCESS MESSAGE DETAILED ===== */
+        #reauthSuccessMessage.show {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 14px;
+            display: flex;
+            font-size: 0.87rem;
+            font-weight: 500;
+            border: 1px solid #a7f3d0;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        #reauthSuccessMessage code {
+            background: white;
+            color: var(--modal-text);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        #reauthSuccessMessage strong {
+            color: var(--modal-text);
+            font-weight: 600;
+        }
+
+        /* ===== PRODUCTS SEARCH LOADER ===== */
+        .products-loader {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: var(--radius-md);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .products-loader-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e8eaed;
+            border-top: 3px solid var(--modal-accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .products-loader-text {
+            font-size: 0.9rem;
+            color: var(--modal-muted);
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- TOPBAR -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <div class="navbar-logo-dot"><i class="ri-settings-3-line"></i></div>
+            <h1>SVLO - V1.0</h1>
+        </div>
+        <div class="navbar-right">
+            <div class="online-status">
+                <span class="status-dot"></span>
+                online
+            </div>
+
+            <div class="navbar-user-badge">
+                <div class="navbar-avatar"><i class="ri-user-line" style="font-size:11px;"></i></div>
+                <span class="user-email" id="userEmail">Carregando...</span>
+                <span class="user-email-short" id="userEmailShort">Carregando...</span>
+                <span class="user-email-initials" id="userEmailInitials">C</span>
+            </div>
+            <button class="btn-logout" id="btnLogout"><i class="ri-logout-box-line"></i> Sair</button>
+        </div>
+    </nav>
+
+    <!-- hidden legacy user-section kept for JS compat -->
+    <div class="user-section" style="display:none;">
+        <span id="userEmailLegacy"></span>
+    </div>
+
+    <!-- PAGE SHELL -->
+    <div class="page-shell">
+
+        <!-- SITE HEADER -->
+        <div class="site-header">
+            <img src="./src/assets/images/profile/photo.webp" class="site-header-logo" alt="Dona Flor"
+                onerror="this.style.display='none'">
+            <div class="site-header-info">
+                <div class="site-header-label">Gerenciando loja</div>
+                <div class="site-header-name">JUVELE</div>
+                <div class="site-header-url">
+                    <a href="index.html" target="_blank">
+                        <i class="ri-external-link-line"></i>juvele.vercel.app
+                    </a>
+                </div>
+            </div>
+            <a href="index.html" class="site-header-back">
+                <i class="ri-arrow-left-line"></i> Ver loja
+            </a>
+        </div>
+
+        <!-- MAIN CONTENT injected here -->
+        <div id="mainContent"></div>
+
+    </div>
+    <!-- Modal Publicar Produto -->
+    <div id="publishModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <div class="modal-icon"><i class="ri-upload-cloud-2-line"></i></div>
+                    <div>
+                        <h2>Publicar Produto</h2>
+                        <p class="modal-subtitle">Preencha os dados do novo produto</p>
+                    </div>
+                </div>
+                <button class="close-btn" id="closeModal" title="Fechar">&times;</button>
+            </div>
+
+            <form id="publishForm">
+                <div class="modal-body">
+                    <p class="form-section-title">Imagens (Máximo 9)</p>
+                    <div class="form-group">
+                        <div class="file-upload-zone" id="publishDropZone">
+                            <input type="file" id="productImagesInput" accept="image/*" multiple>
+                            <div class="file-upload-icon"><i class="ri-image-add-line"></i></div>
+                            <div class="file-upload-text"><strong>Arraste ou clique para adicionar
+                                    imagens</strong><br><span style="font-size:0.75rem;opacity:0.7;">Até 9 imagens —
+                                    JPG, PNG, WEBP</span></div>
+                        </div>
+
+                        <div class="images-carousel" id="imagesCarousel" style="display:none;">
+                            <button type="button" class="carousel-nav left" id="carouselPrev"
+                                aria-label="Imagem anterior"><i class="ri-arrow-left-s-line"></i></button>
+                            <div class="images-track" id="imagesTrack" role="list"></div>
+                            <button type="button" class="carousel-nav right" id="carouselNext"
+                                aria-label="Próxima imagem"><i class="ri-arrow-right-s-line"></i></button>
+                        </div>
+                    </div>
+                    <span class="error-message" id="imageError">Selecione pelo menos uma imagem válida</span>
+
+                    <p class="form-section-title">Informações</p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productTitle">Título <span class="required-star">*</span></label>
+                            <input type="text" id="productTitle" placeholder="Nome do produto" required>
+                            <span class="error-message" id="titleError">Digite um título válido</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="productPrice">Preço (R$) <span class="required-star">*</span></label>
+                            <input type="text" id="productPrice" placeholder="0,00" required>
+                            <span class="error-message" id="priceError">Preço mínimo R$ 1,00</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="productDescription">Descrição</label>
+                        <textarea id="productDescription" placeholder="Descreva o produto..."></textarea>
+                    </div>
+
+                    <p class="form-section-title">Modelos</p>
+                    <div class="form-group">
+                        <label for="modelInput">Adicionar modelo</label>
+                        <input type="text" id="modelInput" placeholder="Ex: Modelo A">
+                        <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+                            <button type="button" class="btn-edit" id="addModelBtn">Adicionar modelo</button>
+                            <span class="error-message" id="modelError" style="display:none;">Digite um modelo
+                                válido</span>
+                        </div>
+                        <div id="modelsContainer" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+                    </div>
+
+                    <p class="form-section-title">Pagamento</p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productDiscount">Desconto (%)</label>
+                            <input type="text" id="productDiscount" placeholder="0" value="0" required>
+                            <span class="error-message" id="discountError">Entre 0 e 100%</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="installments">Total de Parcelas <span class="required-star">*</span></label>
+                            <input type="text" id="installments" placeholder="0" value="0" required>
+                            <span class="error-message" id="installmentsError">Máximo 12 parcelas</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="interestFreeInstallments">Parcelas Sem Juros <span
+                                class="required-star">*</span></label>
+                        <input type="text" id="interestFreeInstallments" placeholder="0" value="0" required>
+                        <span class="error-message" id="interestFreeError">Deve ser menor ou igual ao total</span>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" id="cancelBtn">Cancelar</button>
+                        <div class="spacer"></div>
+                        <button type="submit" class="btn-submit"><i class="ri-upload-cloud-2-line"></i> Publicar
+                            Produto</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Visualizador de Pedidos -->
+    <div id="ordersModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <div class="modal-icon"><i class="ri-file-list-3-line"></i></div>
+                    <div>
+                        <h2>Pedidos</h2>
+                        <p class="modal-subtitle" id="ordersCountText">Carregando pedidos...</p>
+                    </div>
+                </div>
+                <button class="close-btn" id="closeOrdersModal" title="Fechar">&times;</button>
+            </div>
+
+            <!-- Filtro de pedidos abaixo do cabeçalho -->
+            <div class="orders-filter-bar" id="ordersFilterBar">
+                <label>Mostrar:</label>
+                <div id="filterDropdown" style="display: inline-block;"></div>
+            </div>
+
+            <div class="modal-body">
+                <div class="orders-loader" id="ordersLoader">
+                    <div class="orders-loader-spinner"></div>
+                    <div class="orders-loader-text">Carregando pedidos...</div>
+                </div>
+                <div id="ordersList"></div>
+                <div id="ordersEmpty" class="no-results" style="display:none;">
+                    <div class="no-results-icon">📭</div>
+                    Nenhum pedido encontrado.
+                </div>
+            </div>
+
+            <div class="pagination-bar" id="ordersPaginationBar">
+                <button type="button" class="pagination-btn" id="btnPrevPage" title="Página anterior">
+                    <i class="ri-arrow-left-s-line"></i> Anterior
+                </button>
+                <div class="pagination-info" id="paginationInfo">1 de 1</div>
+                <button type="button" class="pagination-btn" id="btnNextPage" title="Próxima página">
+                    Próximo <i class="ri-arrow-right-s-line"></i>
+                </button>
+            </div>
+
+            <div class="modal-footer">
+                <div class="form-actions">
+                    <div class="spacer"></div>
+                    <button type="button" class="btn-cancel" id="btnCloseOrdersFooter">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação de Alteração de Status -->
+    <div id="reauthModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <div class="modal-icon"><i class="ri-question-line"></i></div>
+                    <div>
+                        <h2>Confirmar Alteração</h2>
+                        <p class="modal-subtitle" id="confirmSubtitle">Confirme para prosseguir</p>
+                    </div>
+                </div>
+                <button type="button" class="close-btn" id="closeReauthModal"><i class="ri-close-line"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <div id="confirmMessage" style="font-size:0.95rem;"></div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="cancelReauthBtn">Cancelar</button>
+                    <div class="spacer"></div>
+                    <button type="button" class="btn-submit" id="submitReauthBtn">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gerenciar Produtos -->
+    <div id="manageProductsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <div class="modal-icon"><i class="ri-search-line"></i></div>
+                    <div>
+                        <h2>Gerenciar Produtos</h2>
+                        <p class="modal-subtitle">Busque por ID ou nome do produto</p>
+                    </div>
+                </div>
+                <button class="close-btn" id="manageCloseBtn" title="Fechar">&times;</button>
+            </div>
+
+            <div class="modal-body" style="position:relative;">
+                <div class="search-container">
+                    <input type="text" id="productSearchInput" class="search-input"
+                        placeholder="Digite o ID ou nome do produto e pressione Enter">
+                    <button type="button" id="productSearchBtn" class="search-button">Pesquisar</button>
+                </div>
+
+                <div id="productsGrid" class="products-grid"></div>
+
+                <div id="noProducts" class="no-results" style="display:none;">
+                    <div class="no-results-icon"><i class="ri-inbox-unarchive-line"></i></div>
+                    Nenhum produto encontrado.
+                </div>
+
+                <!-- Loader para busca de produtos -->
+                <div id="productsLoader" class="products-loader" style="display:none;">
+                    <div class="products-loader-spinner"></div>
+                    <div class="products-loader-text">Buscando produtos...</div>
+                </div>
+            </div>
+
+            <div class="pagination-bar" id="productsPaginationBar" style="display:none;">
+                <button type="button" class="pagination-btn" id="productsPrevBtn" title="Página anterior">
+                    <i class="ri-arrow-left-s-line"></i>
+                </button>
+                <div class="pagination-info" id="productsPaginationInfo">1 de 1</div>
+                <button type="button" class="pagination-btn" id="productsNextBtn" title="Próxima página">
+                    <i class="ri-arrow-right-s-line"></i>
+                </button>
+            </div>
+
+            <div class="modal-footer">
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="manageCancelBtn">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Produto -->
+    <div id="editProductModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <div class="modal-icon"><i class="ri-edit-line"></i></div>
+                    <div>
+                        <h2>Editar Produto</h2>
+                        <p class="modal-subtitle">Altere as informações e salve as alterações</p>
+                    </div>
+                </div>
+                <button class="close-btn" id="closeEditModal" title="Fechar">&times;</button>
+            </div>
+
+            <form id="editProductForm">
+                <div class="modal-body">
+                    <p class="form-section-title">Imagens (Máximo 9)</p>
+                    <div class="form-group">
+                        <div class="file-upload-zone" id="editDropZone">
+                            <input type="file" id="editProductImagesInput" accept="image/*" multiple>
+                            <div class="file-upload-icon"><i class="ri-image-add-line"></i></div>
+                            <div class="file-upload-text"><strong>Arraste ou clique para adicionar
+                                    imagens</strong><br><span style="font-size:0.75rem;opacity:0.7;">Até 9 imagens —
+                                    JPG, PNG, WEBP</span></div>
+                        </div>
+
+                        <div class="images-carousel" id="editImagesCarousel" style="display:none;">
+                            <button type="button" class="carousel-nav left" id="editCarouselPrev"
+                                aria-label="Imagem anterior"><i class="ri-arrow-left-s-line"></i></button>
+                            <div class="images-track" id="editImagesTrack" role="list"></div>
+                            <button type="button" class="carousel-nav right" id="editCarouselNext"
+                                aria-label="Próxima imagem"><i class="ri-arrow-right-s-line"></i></button>
+                        </div>
+                    </div>
+
+                    <p class="form-section-title">Informações</p>
+                    <div class="form-group">
+                        <label>ID</label>
+                        <div id="editProductId"
+                            style="padding: 9px 12px; background: var(--modal-input-bg); border: 1.5px solid var(--modal-border); border-radius: var(--radius-sm); font-size: 0.9rem; color: var(--modal-muted); font-family: 'DM Sans', Arial, sans-serif;">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editProductTitle">Título <span class="required-star">*</span></label>
+                            <input type="text" id="editProductTitle" placeholder="Nome do produto" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editProductPrice">Preço (R$) <span class="required-star">*</span></label>
+                            <input type="text" id="editProductPrice" placeholder="0,00" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductDescription">Descrição</label>
+                        <textarea id="editProductDescription" placeholder="Descreva o produto..."></textarea>
+                    </div>
+
+                    <p class="form-section-title">Modelos</p>
+                    <div class="form-group">
+                        <label for="editModelInput">Adicionar modelo</label>
+                        <input type="text" id="editModelInput" placeholder="Ex: Modelo A">
+                        <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+                            <button type="button" class="btn-edit" id="addEditModelBtn">Adicionar modelo</button>
+                            <span class="error-message" id="editModelError" style="display:none;">Digite um modelo
+                                válido</span>
+                        </div>
+                        <div id="editModelsContainer" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                        </div>
+                    </div>
+
+                    <p class="form-section-title">Pagamento</p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editProductDiscount">Desconto (%)</label>
+                            <input type="text" id="editProductDiscount" placeholder="0" value="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editInstallments">Total de Parcelas <span class="required-star">*</span></label>
+                            <input type="text" id="editInstallments" placeholder="0" value="0" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editInterestFreeInstallments">Parcelas Sem Juros <span
+                                class="required-star">*</span></label>
+                        <input type="text" id="editInterestFreeInstallments" placeholder="0" value="0" required>
+                    </div>
+
+                    <p class="form-section-title">Disponibilidade</p>
+                    <div class="form-group">
+                        <label class="toggle-group">
+                            <div class="toggle-label-text">
+                                <span>Disponível para venda</span>
+                                <span>Marque para ativar este produto</span>
+                            </div>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="editProductAvailability">
+                                <span class="toggle-track"></span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" id="cancelEditBtn">Cancelar</button>
+                        <div class="spacer"></div>
+                        <button type="button" class="btn-delete" id="deleteProductBtn">Excluir</button>
+                        <button type="submit" class="btn-submit"><i class="ri-save-line"></i> Salvar Alterações</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+
+        // Inicializar cliente Supabase
+        const { createClient } = window.supabase;
+        const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+
+        const mainContent = document.getElementById('mainContent');
+        const userEmailSpan = document.getElementById('userEmail');
+        const btnLogout = document.getElementById('btnLogout');
+
+        let currentUser = null;
+        let imagekitCredentials = null;
+
+        // Modal e Formulário de Publicação
+        const publishModal = document.getElementById('publishModal');
+        const publishForm = document.getElementById('publishForm');
+        const closeModalBtn = document.getElementById('closeModal');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const productImagesInput = document.getElementById('productImagesInput');
+        const publishDropZone = document.getElementById('publishDropZone');
+        const imagesTrack = document.getElementById('imagesTrack');
+        const imagesCarousel = document.getElementById('imagesCarousel');
+        const carouselPrev = document.getElementById('carouselPrev');
+        const carouselNext = document.getElementById('carouselNext');
+
+        let selectedImages = []; // array of { file, dataUrl }
+
+        // Drag-and-drop state para carousel de publicação
+        let dragStatePublish = {
+            isDragging: false,
+            startX: 0,
+            startIndex: -1,
+            currentOffsetX: 0,
+            dragThreshold: 30
+        };
+
+        // Modelos (variáveis do DOM e estado)
+        const modelInput = document.getElementById('modelInput');
+        const addModelBtn = document.getElementById('addModelBtn');
+        const modelsContainer = document.getElementById('modelsContainer');
+        let selectedModels = []; // array of strings
+
+        function openPublishModal() {
+            publishModal.style.display = 'flex';
+            publishForm.reset();
+            selectedImages = [];
+            if (imagesTrack) imagesTrack.innerHTML = '';
+            if (imagesCarousel) imagesCarousel.style.display = 'none';
+            if (productImagesInput) productImagesInput.value = '';
+            // Reset modelos
+            selectedModels = [];
+            if (modelsContainer) modelsContainer.innerHTML = '';
+            if (modelInput) modelInput.value = '';
+        }
+
+        function closePublishModal() {
+            publishModal.style.display = 'none';
+            publishForm.reset();
+            selectedImages = [];
+            if (imagesTrack) imagesTrack.innerHTML = '';
+            if (imagesCarousel) imagesCarousel.style.display = 'none';
+            if (productImagesInput) productImagesInput.value = '';
+            // Reset modelos
+            selectedModels = [];
+            if (modelsContainer) modelsContainer.innerHTML = '';
+            if (modelInput) modelInput.value = '';
+        }
+
+        // Buscar credenciais do ImageKit do Supabase
+        async function fetchImagekitCredentials() {
+            try {
+                // Verificar autenticação
+                const { data: { session } } = await supabase.auth.getSession();
+
+                const { data, error } = await supabase
+                    .from('credenciais-imagekit')
+                    .select('*');
+
+                if (error) {
+                    throw error;
+                }
+
+                if (!data || data.length === 0) {
+                    alert('⚠️ Nenhuma credencial do ImageKit encontrada. Verifique as políticas RLS.');
+                    return;
+                }
+
+                const firstCredential = data[0];
+                // Mapear as credenciais com trim para remover espaços
+                imagekitCredentials = {
+                    private_key: (firstCredential.private_key || '').trim(),
+                    public_key: (firstCredential.public_key || '').trim(),
+                    imagekit_id: (firstCredential['imagekit-id'] || '').trim(),
+                    url_endpoint: (firstCredential['url-endpoint'] || '').trim()
+                };
+            } catch (error) {
+                alert('❌ Erro ao carregar configurações:\n' + error.message);
+            }
+        }
+
+        // Comprimir imagem para WebP (40-70 KB) e redimensionar para máx 800x800
+        async function compressImageToWebP(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+
+                reader.onload = (event) => {
+                    const img = new Image();
+
+                    img.onload = () => {
+                        // Calcular dimensões redimensionadas mantendo a proporção
+                        let newWidth = img.width;
+                        let newHeight = img.height;
+                        const maxDimension = 800;
+
+                        if (newWidth > maxDimension || newHeight > maxDimension) {
+                            const aspectRatio = img.width / img.height;
+                            if (newWidth > newHeight) {
+                                newWidth = maxDimension;
+                                newHeight = Math.round(maxDimension / aspectRatio);
+                            } else {
+                                newHeight = maxDimension;
+                                newWidth = Math.round(maxDimension * aspectRatio);
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = newWidth;
+                        canvas.height = newHeight;
+
+                        const ctx = canvas.getContext('2d');
+                        // Desenhar a imagem redimensionada no canvas
+                        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+                        // Função para tentar compressão com diferentes qualidades
+                        const tryCompress = (quality) => {
+                            canvas.toBlob(
+                                (blob) => {
+                                    const sizeInKB = blob.size / 1024;
+
+                                    // Verificar se está no intervalo desejado (40-70 KB)
+                                    if (sizeInKB >= 40 && sizeInKB <= 70) {
+                                        resolve(blob);
+                                    } else if (sizeInKB > 70 && quality > 0.3) {
+                                        // Se muito grande, reduzir qualidade
+                                        tryCompress(quality - 0.05);
+                                    } else if (sizeInKB < 40 && quality < 1) {
+                                        // Se muito pequeno, aumentar qualidade
+                                        tryCompress(quality + 0.05);
+                                    } else {
+                                        // Aceitar o tamanho mais próximo
+                                        resolve(blob);
+                                    }
+                                },
+                                'image/webp',
+                                quality
+                            );
+                        };
+
+                        // Começar com qualidade 0.8
+                        tryCompress(0.8);
+                    };
+
+                    img.onerror = () => {
+                        reject(new Error('Erro ao carregar imagem'));
+                    };
+
+                    img.src = event.target.result;
+                };
+
+                reader.onerror = () => {
+                    reject(new Error('Erro ao ler arquivo'));
+                };
+
+                reader.readAsDataURL(file);
+            });
+        }
+
+
+
+        // Gerar código único para renomear arquivo (C + 54 caracteres aleatórios + PS)
+        function generateUniqueFileCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let randomPart = '';
+            for (let i = 0; i < 54; i++) {
+                randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return 'C' + randomPart + 'PS';
+        }
+
+        // Upload de imagem para ImageKit
+        async function uploadImageToImageKit(imageBlob) {
+            if (!imagekitCredentials) {
+                alert('❌ Credenciais do ImageKit não estão disponíveis');
+                return null;
+            }
+
+            try {
+                // Validar credenciais
+
+                if (!imagekitCredentials.private_key || !imagekitCredentials.public_key) {
+                    alert('❌ Credenciais incompletas. Verifique o banco de dados.');
+                    return null;
+                }
+
+                const formData = new FormData();
+                const uniqueFileName = generateUniqueFileCode();
+                formData.append('file', imageBlob, `${uniqueFileName}.webp`);
+                formData.append('publicKey', imagekitCredentials.public_key);
+                formData.append('fileName', uniqueFileName);
+                formData.append('folder', '/produtos');
+
+                // Criar string de autenticação Basic Auth
+                const authString = imagekitCredentials.private_key + ':';
+                const encodedAuth = btoa(authString);
+
+                // Fazer upload para ImageKit via API
+                const response = await fetch(`https://upload.imagekit.io/api/v1/files/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Basic ${encodedAuth}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(`${result.message || response.statusText}`);
+                }
+
+                return result;
+            } catch (error) {
+                alert('❌ Erro ao fazer upload:\n' + error.message);
+                return null;
+            }
+        }
+
+        // Helpers for multi-image input and carousel
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function addFiles(fileList) {
+            if (!fileList) return;
+            const files = Array.from(fileList);
+            for (const file of files) {
+                if (!file.type || !file.type.startsWith('image/')) continue;
+                if (selectedImages.length >= 9) break;
+                const dataUrl = await readFileAsDataURL(file);
+                selectedImages.push({ file, dataUrl });
+                renderImagesCarousel();
+            }
+        }
+
+        function renderImagesCarousel() {
+            if (!imagesTrack || !imagesCarousel) return;
+            imagesTrack.innerHTML = '';
+            if (!selectedImages || selectedImages.length === 0) {
+                imagesCarousel.style.display = 'none';
+                return;
+            }
+            imagesCarousel.style.display = 'flex';
+            selectedImages.forEach((imgObj, idx) => {
+                const item = document.createElement('div');
+                item.className = 'image-item';
+                const img = document.createElement('img');
+                img.src = imgObj.dataUrl;
+                img.alt = `Prévia ${idx + 1}`;
+                img.loading = 'lazy';
+                item.appendChild(img);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'remove-image-btn';
+                btn.title = 'Remover';
+                btn.innerHTML = '&times;';
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    selectedImages.splice(idx, 1);
+                    renderImagesCarousel();
+                });
+                item.appendChild(btn);
+                imagesTrack.appendChild(item);
+            });
+
+            // show/hide nav
+            if (selectedImages.length <= 1) {
+                if (carouselPrev) carouselPrev.style.display = 'none';
+                if (carouselNext) carouselNext.style.display = 'none';
+            } else {
+                if (carouselPrev) carouselPrev.style.display = 'flex';
+                if (carouselNext) carouselNext.style.display = 'flex';
+            }
+
+            // Inicializar drag-and-drop
+            initializeDragAndDropPublish();
+        }
+
+        function scrollCarousel(direction) {
+            if (!imagesTrack) return;
+            const item = imagesTrack.querySelector('.image-item');
+            const gap = 8;
+            const step = (item ? item.offsetWidth : 130) + gap;
+            imagesTrack.scrollBy({ left: direction * step, behavior: 'smooth' });
+        }
+
+        // ===== Drag-and-drop para carousel de publicação =====
+        function initializeDragAndDropPublish() {
+            if (!imagesTrack) return;
+            const items = imagesTrack.querySelectorAll('.image-item');
+
+            items.forEach((item, index) => {
+                item.addEventListener('mousedown', (e) => {
+                    dragStatePublish.isDragging = true;
+                    dragStatePublish.startX = e.clientX;
+                    dragStatePublish.startIndex = index;
+                    dragStatePublish.currentOffsetX = 0;
+                    item.classList.add('dragging');
+                });
+            });
+        }
+
+        function handleDragMovePublish(e) {
+            if (!dragStatePublish.isDragging) return;
+            const moveX = e.clientX - dragStatePublish.startX;
+            dragStatePublish.currentOffsetX = moveX;
+
+            const draggedItem = imagesTrack?.children[dragStatePublish.startIndex];
+            if (draggedItem) {
+                draggedItem.style.transform = `translateX(${moveX}px) scale(1.05)`;
+            }
+        }
+
+        function handleDragEndPublish(e) {
+            if (!dragStatePublish.isDragging) return;
+            dragStatePublish.isDragging = false;
+
+            const draggedItem = imagesTrack?.children[dragStatePublish.startIndex];
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+                draggedItem.style.transform = '';
+            }
+
+            // Reordenar para posição mais próxima baseado no movimento
+            if (selectedImages.length > 1) {
+                const startIndex = dragStatePublish.startIndex;
+                const moveX = dragStatePublish.currentOffsetX;
+                const itemSize = 120 + 8; // width + gap
+
+                // Calcular quantas posições foram movidas
+                let newIndex = startIndex + Math.round(moveX / itemSize);
+
+                if (newIndex !== startIndex) {
+                    // Remover do índice original
+                    const [removed] = selectedImages.splice(startIndex, 1);
+                    // Clampar ao novo tamanho do array (após remoção)
+                    newIndex = Math.max(0, Math.min(selectedImages.length, newIndex));
+                    // Inserir na nova posição
+                    selectedImages.splice(newIndex, 0, removed);
+                    renderImagesCarousel();
+                }
+            }
+
+            dragStatePublish.startIndex = -1;
+            dragStatePublish.currentOffsetX = 0;
+        }
+
+        // ===== Drag-and-drop para carousel de edição =====
+        function initializeDragAndDropEdit() {
+            if (!editImagesTrack) return;
+            const items = editImagesTrack.querySelectorAll('.image-item');
+
+            items.forEach((item, index) => {
+                item.addEventListener('mousedown', (e) => {
+                    dragStateEdit.isDragging = true;
+                    dragStateEdit.startX = e.clientX;
+                    dragStateEdit.startIndex = index;
+                    dragStateEdit.currentOffsetX = 0;
+                    item.classList.add('dragging');
+                });
+            });
+        }
+
+        function handleDragMoveEdit(e) {
+            if (!dragStateEdit.isDragging) return;
+            const moveX = e.clientX - dragStateEdit.startX;
+            dragStateEdit.currentOffsetX = moveX;
+
+            const draggedItem = editImagesTrack?.children[dragStateEdit.startIndex];
+            if (draggedItem) {
+                draggedItem.style.transform = `translateX(${moveX}px) scale(1.05)`;
+            }
+        }
+
+        function handleDragEndEdit(e) {
+            if (!dragStateEdit.isDragging) return;
+            dragStateEdit.isDragging = false;
+
+            const draggedItem = editImagesTrack?.children[dragStateEdit.startIndex];
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+                draggedItem.style.transform = '';
+            }
+
+            // Reordenar para posição mais próxima baseado no movimento
+            if (editSelectedImages.length > 1) {
+                const startIndex = dragStateEdit.startIndex;
+                const moveX = dragStateEdit.currentOffsetX;
+                const itemSize = 120 + 8; // width + gap
+
+                // Calcular quantas posições foram movidas
+                let newIndex = startIndex + Math.round(moveX / itemSize);
+
+                if (newIndex !== startIndex) {
+                    // Remover do índice original
+                    const [removed] = editSelectedImages.splice(startIndex, 1);
+                    // Clampar ao novo tamanho do array (após remoção)
+                    newIndex = Math.max(0, Math.min(editSelectedImages.length, newIndex));
+                    // Inserir na nova posição
+                    editSelectedImages.splice(newIndex, 0, removed);
+                    renderEditImagesCarousel();
+                }
+            }
+
+            dragStateEdit.startIndex = -1;
+            dragStateEdit.currentOffsetX = 0;
+        }
+
+        // ===== Modelos helpers =====
+        function addModelFromInput() {
+            if (!modelInput) return;
+            const errEl = document.getElementById('modelError');
+            if (errEl) errEl.style.display = 'none';
+            const val = modelInput.value.trim();
+            if (!val) {
+                if (errEl) errEl.style.display = 'block';
+                return;
+            }
+            // evitar duplicatas (case-insensitive)
+            if (selectedModels.some(m => m.name.toLowerCase() === val.toLowerCase())) {
+                modelInput.value = '';
+                return;
+            }
+            selectedModels.push({ name: val, qty: 1 });
+            renderModelBadges();
+            modelInput.value = '';
+            modelInput.focus();
+        }
+
+        function renderModelBadges() {
+            if (!modelsContainer) return;
+            modelsContainer.innerHTML = '';
+            selectedModels.forEach((modelObj, idx) => {
+                const badge = document.createElement('div');
+                badge.className = 'model-badge';
+                badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--modal-surface);border:1px solid var(--modal-border);font-weight:600;color:var(--modal-text);';
+
+                // Input de quantidade
+                const qtyInput = document.createElement('input');
+                qtyInput.type = 'number';
+                qtyInput.min = '1';
+                qtyInput.max = '999';
+                qtyInput.value = modelObj.qty;
+                qtyInput.style.cssText = 'width:40px;height:24px;padding:2px 4px;border:1px solid var(--modal-border);border-radius:4px;text-align:center;font-size:0.8rem;font-family:inherit;';
+                qtyInput.addEventListener('change', (e) => {
+                    const newQty = parseInt(e.target.value) || 1;
+                    modelObj.qty = Math.max(1, Math.min(999, newQty));
+                    e.target.value = modelObj.qty;
+                });
+
+                const text = document.createElement('span');
+                text.textContent = modelObj.name;
+                text.style.whiteSpace = 'nowrap';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'remove-model';
+                removeBtn.style.cssText = 'background:transparent;border:none;color:var(--modal-muted);cursor:pointer;font-weight:700;padding:0 4px;margin-left:2px;';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.addEventListener('click', () => {
+                    selectedModels.splice(idx, 1);
+                    renderModelBadges();
+                });
+
+                badge.appendChild(qtyInput);
+                badge.appendChild(text);
+                badge.appendChild(removeBtn);
+                modelsContainer.appendChild(badge);
+            });
+        }
+
+        if (addModelBtn) addModelBtn.addEventListener('click', addModelFromInput);
+        if (modelInput) modelInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addModelFromInput();
+            }
+        });
+
+        if (publishDropZone) {
+            publishDropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                publishDropZone.classList.add('drag-over');
+            });
+            publishDropZone.addEventListener('dragleave', () => {
+                publishDropZone.classList.remove('drag-over');
+            });
+            publishDropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                publishDropZone.classList.remove('drag-over');
+                if (e.dataTransfer && e.dataTransfer.files) {
+                    addFiles(e.dataTransfer.files);
+                }
+            });
+        }
+
+        if (productImagesInput) {
+            productImagesInput.addEventListener('change', (e) => {
+                addFiles(e.target.files);
+                e.target.value = '';
+            });
+        }
+
+        if (carouselPrev) carouselPrev.addEventListener('click', () => scrollCarousel(-1));
+        if (carouselNext) carouselNext.addEventListener('click', () => scrollCarousel(1));
+
+        // Função para formatar preço com centavos (BRL)
+        function formatPriceInput(inputElement) {
+            let value = inputElement.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+
+            if (value === '') {
+                inputElement.value = '0,00';
+                return;
+            }
+
+            // Estratégia inteligente: interpretar baseado no comprimento
+            // 1-2 dígitos: considerar como reais inteiros (ex: "50" → "50,00")
+            // 3+ dígitos: últimos 2 como centavos (ex: "5050" → "50,50")
+            let formattedValue;
+
+            if (value.length <= 2) {
+                // Pouco dígitos: tratar como reais inteiros
+                formattedValue = value + ',00';
+            } else {
+                // Muitos dígitos: últimos 2 são centavos
+                const integerPart = value.slice(0, -2).replace(/^0+/, '') || '0';
+                const decimalPart = value.slice(-2);
+                formattedValue = integerPart + ',' + decimalPart;
+            }
+
+            inputElement.value = formattedValue;
+        }
+
+        // Evento de formatação para campo de preço na publicação
+        const productPriceInput = document.getElementById('productPrice');
+        if (productPriceInput) {
+            productPriceInput.addEventListener('input', function () {
+                formatPriceInput(this);
+            });
+
+            productPriceInput.addEventListener('blur', function () {
+                let value = this.value.replace(/\D/g, '');
+                if (value === '') {
+                    this.value = '0,00';
+                }
+            });
+        }
+
+        // Evento de formatação para campo de preço na edição
+        const editProductPriceInput = document.getElementById('editProductPrice');
+        if (editProductPriceInput) {
+            editProductPriceInput.addEventListener('input', function () {
+                formatPriceInput(this);
+            });
+
+            editProductPriceInput.addEventListener('blur', function () {
+                let value = this.value.replace(/\D/g, '');
+                if (value === '') {
+                    this.value = '0,00';
+                }
+            });
+        }
+
+        // Função para formatar desconto (0-100, inteiros)
+        function formatDiscountInput(inputElement) {
+            let value = inputElement.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+
+            if (value === '') {
+                inputElement.value = '0';
+                return;
+            }
+
+            // Converte para número e limita a 100
+            let numValue = parseInt(value);
+            if (numValue > 100) {
+                numValue = 100;
+            }
+
+            inputElement.value = numValue.toString();
+        }
+
+        // Função para formatar parcelas (0-12, inteiros)
+        function formatInstallmentsInput(inputElement, maxValue = 24) {
+            let value = inputElement.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+
+            if (value === '') {
+                inputElement.value = '0';
+                return;
+            }
+
+            // Converte para número e limita ao maxValue
+            let numValue = parseInt(value);
+            if (numValue > maxValue) {
+                numValue = maxValue;
+            }
+
+            inputElement.value = numValue.toString();
+        }
+
+        // Event listeners para desconto e parcelas na publicação
+        const productDiscountInput = document.getElementById('productDiscount');
+        const installmentsInput = document.getElementById('installments');
+        const interestFreeInstallmentsInput = document.getElementById('interestFreeInstallments');
+
+        if (productDiscountInput) {
+            productDiscountInput.addEventListener('input', function () {
+                formatDiscountInput(this);
+            });
+
+            productDiscountInput.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                }
+            });
+        }
+
+        if (installmentsInput) {
+            installmentsInput.addEventListener('input', function () {
+                formatInstallmentsInput(this);
+            });
+
+            installmentsInput.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                }
+            });
+        }
+
+        if (interestFreeInstallmentsInput) {
+            interestFreeInstallmentsInput.addEventListener('input', function () {
+                formatInstallmentsInput(this);
+            });
+
+            interestFreeInstallmentsInput.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                }
+            });
+        }
+
+        // Event listeners para desconto e parcelas na edição
+        const editProductDiscountInput = document.getElementById('editProductDiscount');
+        const editInstallmentsInput = document.getElementById('editInstallments');
+        const editInterestFreeInstallmentsInput = document.getElementById('editInterestFreeInstallments');
+
+        if (editProductDiscountInput) {
+            editProductDiscountInput.addEventListener('input', function () {
+                formatDiscountInput(this);
+            });
+
+            editProductDiscountInput.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                }
+            });
+        }
+
+        if (editInstallmentsInput) {
+            editInstallmentsInput.addEventListener('input', function () {
+                formatInstallmentsInput(this);
+            });
+
+            editInstallmentsInput.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                }
+            });
+        }
+
+        if (editInterestFreeInstallmentsInput) {
+            editInterestFreeInstallmentsInput.addEventListener('input', function () {
+                formatInstallmentsInput(this);
+            });
+
+            editInterestFreeInstallmentsInput.addEventListener('blur', function () {
+                if (this.value === '') {
+                    this.value = '0';
+                }
+            });
+        }
+
+        // Função para validar título - não permite espaços no início nem emojis
+        function validateTitleInput(inputElement) {
+            let value = inputElement.value;
+
+            // Se vazio, deixa como está
+            if (value === '') return;
+
+            // Remove espaços no início
+            let cleaned = value.replace(/^\s+/, '');
+
+            // Remove emojis de qualquer posição
+            cleaned = cleaned.replace(/[\p{Emoji}\p{Emoji_Presentation}]/gu, '');
+
+            // Se houve alteração, atualiza o valor
+            if (value !== cleaned) {
+                inputElement.value = cleaned;
+            }
+        }
+
+        // Event listeners para validar título na publicação
+        const productTitleInput = document.getElementById('productTitle');
+        if (productTitleInput) {
+            productTitleInput.addEventListener('input', function () {
+                validateTitleInput(this);
+            });
+        }
+
+        // Event listeners para validar título na edição
+        const editProductTitleInput = document.getElementById('editProductTitle');
+        if (editProductTitleInput) {
+            editProductTitleInput.addEventListener('input', function () {
+                validateTitleInput(this);
+            });
+        }
+
+        closeModalBtn.addEventListener('click', closePublishModal);
+        cancelBtn.addEventListener('click', closePublishModal);
+
+        // Fechar ao clicar fora do modal
+        window.addEventListener('click', (event) => {
+            if (event.target === publishModal) {
+                closePublishModal();
+            }
+        });
+
+        // Validar e enviar formulário
+        publishForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Limpar mensagens de erro
+            document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
+
+            // Validar campos
+            const title = document.getElementById('productTitle').value.trim();
+            const priceStr = document.getElementById('productPrice').value.replace(',', '.');
+            const price = parseFloat(priceStr);
+            const discount = parseFloat(document.getElementById('productDiscount').value);
+            const installments = parseInt(document.getElementById('installments').value);
+            const interestFreeInstallments = parseInt(document.getElementById('interestFreeInstallments').value);
+            const imagesFiles = selectedImages.map(i => i.file);
+
+            let isValid = true;
+
+            // Validações
+            if (!imagesFiles || imagesFiles.length === 0) {
+                document.getElementById('imageError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (!title) {
+                document.getElementById('titleError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (isNaN(price) || price < 1) {
+                document.getElementById('priceError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (isNaN(discount) || discount < 0) {
+                document.getElementById('discountError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (selectedModels.length === 0) {
+                document.getElementById('modelError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (isNaN(installments) || installments < 0 || installments > 24) {
+                document.getElementById('installmentsError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (isNaN(interestFreeInstallments) || interestFreeInstallments < 0 || interestFreeInstallments > installments) {
+                document.getElementById('interestFreeError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (!isValid) {
+                return;
+            }
+
+            // Mostrar feedback de upload
+            const submitBtn = publishForm.querySelector('.btn-submit');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = '⏳ Preparando imagens...';
+            submitBtn.disabled = true;
+
+            try {
+                const imageUrls = [];
+                const imageIds = [];
+
+                for (let i = 0; i < imagesFiles.length; i++) {
+                    const file = imagesFiles[i];
+                    submitBtn.textContent = `⏳ Comprimindo imagem ${i + 1} de ${imagesFiles.length}...`;
+                    const compressed = await compressImageToWebP(file);
+
+                    submitBtn.textContent = `⏳ Enviando imagem ${i + 1} de ${imagesFiles.length} para ImageKit...`;
+                    const uploadResult = await uploadImageToImageKit(compressed);
+
+                    if (uploadResult) {
+                        imageUrls.push(uploadResult.url);
+                        imageIds.push(uploadResult.fileId);
+                    }
+                }
+
+                if (imageUrls.length > 0) {
+                    const imageUrlsString = imageUrls.join('\\:@\\');
+                    const imageIdsString = imageIds.join('\\:@\\');
+
+                    // Preparar string de modelos com quantidades: ordenar, maiúsculas e separar por vírgula
+                    let modelsString = 'ÚNICO';
+                    if (selectedModels && selectedModels.length > 0) {
+                        modelsString = selectedModels
+                            .slice()
+                            .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+                            .map(m => m.name.toUpperCase() + '*' + m.qty)
+                            .join(',');
+                    }
+
+                    // Preparar dados do produto para inserir no Supabase
+                    const productData = {
+                        PRODUTO: title,
+                        PREÇO: price.toString(),
+                        'IMAGE-URL': imageUrlsString,
+                        'IMAGE-ID': imageIdsString,
+                        DESCONTO: discount.toString(),
+                        PARCELAMENTO: `${installments},${interestFreeInstallments}`,
+                        DESCRIPTION: document.getElementById('productDescription').value,
+                        product_model: modelsString,
+                        DISPONIBILIDADE: true
+                    };
+
+                    // Inserir produto na tabela 'j-box'
+                    const { error: insertError } = await supabase
+                        .from('j-box')
+                        .insert([productData]);
+
+                    if (insertError) {
+                        alert('❌ Imagem(ns) publicada(s), mas erro ao salvar produto:\n' + insertError.message);
+                    } else {
+                        const imagenCount = imageUrls.length === 1 ? 'uma imagem' : `${imageUrls.length} imagens`;
+                        alert('✅ Produto publicado com sucesso!\n\nTítulo: ' + title + '\nImagens: ' + imagenCount + '\nURLs: ' + imageUrlsString);
+                        closePublishModal();
+                    }
+                } else {
+                    alert('❌ Nenhuma imagem foi enviada.');
+                }
+            } catch (error) {
+                alert('❌ Erro ao processar imagem(ns):\n' + error.message);
+            } finally {
+                // Restaurar botão
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        // ===== GERENCIAMENTO DE PRODUTOS =====
+        // Gerenciador de produtos removido — HTML e JS eliminados conforme solicitado.
+        // Mantém apenas o carregamento do painel administrativo sem a opção de gerenciar produtos.
+        function loadAdminContent() {
+            const firstName = (currentUser.email || '').split('@')[0];
+
+            mainContent.innerHTML = `
+                <div class="welcome-card">
+                    <div class="welcome-greeting">Bem-vindo de volta</div>
+                    <h2>${firstName} </h2>
+                    <p>${currentUser.email}</p>
+                    <div class="welcome-card-icon"><img src="./src/assets/images/profile/photo.webp" alt="Icon" style="width: 150px; border-radius: 20%;"></div>
+                </div>
+
+                <div class="action-grid">
+                    <button class="action-card" id="btnPublishProduct">
+                        <div class="action-card-icon blue"><i class="ri-upload-cloud-2-line"></i></div>
+                        <div class="action-card-body">
+                            <div class="action-card-title">Publicar Produto</div>
+                            <div class="action-card-desc">Adicione um novo produto à loja com imagem e preço</div>
+                        </div>
+                    </button>
+                    <button class="action-card" id="btnManageProducts">
+                        <div class="action-card-icon orange"><i class="ri-store-2-line"></i></div>
+                        <div class="action-card-body">
+                            <div class="action-card-title">Gerenciar Produtos</div>
+                            <div class="action-card-desc">Buscar, editar e remover produtos</div>
+                        </div>
+                    </button>
+                    <button class="action-card" id="btnViewOrders" style="position: relative;">
+                        <div class="orders-notification-badge hidden" id="ordersNotificationBadge">0</div>
+                        <div class="action-card-icon blue"><i class="ri-file-list-3-line"></i></div>
+                        <div class="action-card-body">
+                            <div class="action-card-title">Visualizar Pedidos</div>
+                            <div class="action-card-desc">Veja a lista de pedidos e detalhes dos clientes</div>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="info-strip">
+                    <i class="ri-shield-check-line"></i>
+                    Sessão autenticada com segurança · Todas as alterações são salvas em tempo real no Supabase
+                </div>
+            `;
+
+            document.getElementById('btnPublishProduct').addEventListener('click', openPublishModal);
+            document.getElementById('btnViewOrders').addEventListener('click', openOrdersModal);
+            const manageBtn = document.getElementById('btnManageProducts');
+            if (manageBtn) manageBtn.addEventListener('click', openManageProductsModal);
+
+            fetchImagekitCredentials();
+
+            // Buscar pedidos pendentes logo ao carregar o painel para atualizar o badge
+            fetchOrders('pending').catch(err => console.error('Erro ao buscar pedidos pendentes:', err));
+
+            // Vincular mudança do filtro para recarregar pedidos quando selecionado
+            const ordersFilterEl = document.getElementById('ordersFilter');
+            if (ordersFilterEl) {
+                ordersFilterEl.addEventListener('change', fetchOrders);
+            }
+        }
+
+        // Produtos: funções de gerenciamento (busca e edição)
+        const manageProductsModal = document.getElementById('manageProductsModal');
+        const productSearchInput = document.getElementById('productSearchInput');
+        const productSearchBtn = document.getElementById('productSearchBtn');
+        const productsGrid = document.getElementById('productsGrid');
+        const noProductsEl = document.getElementById('noProducts');
+        const manageCloseBtn = document.getElementById('manageCloseBtn');
+        const manageCancelBtn = document.getElementById('manageCancelBtn');
+        const productsPaginationBar = document.getElementById('productsPaginationBar');
+        const productsPrevBtn = document.getElementById('productsPrevBtn');
+        const productsNextBtn = document.getElementById('productsNextBtn');
+        const productsPaginationInfo = document.getElementById('productsPaginationInfo');
+
+        const editProductModal = document.getElementById('editProductModal');
+        const editProductForm = document.getElementById('editProductForm');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        const closeEditModalBtn = document.getElementById('closeEditModal');
+        const deleteProductBtn = document.getElementById('deleteProductBtn');
+
+        // Variáveis para edição de produto (imagens e modelos)
+        const editDropZone = document.getElementById('editDropZone');
+        const editProductImagesInput = document.getElementById('editProductImagesInput');
+        const editImagesTrack = document.getElementById('editImagesTrack');
+        const editImagesCarousel = document.getElementById('editImagesCarousel');
+        const editCarouselPrev = document.getElementById('editCarouselPrev');
+        const editCarouselNext = document.getElementById('editCarouselNext');
+        const addEditModelBtn = document.getElementById('addEditModelBtn');
+        const editModelInput = document.getElementById('editModelInput');
+        const editModelsContainer = document.getElementById('editModelsContainer');
+
+        let editSelectedImages = []; // array of { file, dataUrl } para imagens do editor
+        let editSelectedModels = []; // array de strings para modelos do editor
+        let currentEditingProductId = null; // rastrear qual produto está sendo editado
+
+        // Drag-and-drop state para carousel de edição
+        let dragStateEdit = {
+            isDragging: false,
+            startX: 0,
+            startIndex: -1,
+            currentOffsetX: 0,
+            dragThreshold: 30
+        };
+
+        // Variáveis para paginação de produtos
+        const PRODUCTS_PER_PAGE = 9;
+        let allProductsData = [];
+        let currentProductPage = 1;
+        let totalProductPages = 1;
+
+        function openManageProductsModal() {
+            if (manageProductsModal) manageProductsModal.style.display = 'flex';
+            if (productSearchInput) {
+                productSearchInput.value = '';
+                productSearchInput.focus();
+            }
+            if (productsGrid) productsGrid.innerHTML = '';
+            if (noProductsEl) noProductsEl.style.display = 'none';
+            allProductsData = [];
+            currentProductPage = 1;
+            totalProductPages = 1;
+            if (productsPaginationBar) productsPaginationBar.style.display = 'none';
+        }
+
+        function closeManageProductsModal() {
+            if (manageProductsModal) manageProductsModal.style.display = 'none';
+        }
+
+        async function searchProducts(query) {
+            const loader = document.getElementById('productsLoader');
+            if (!query || !query.trim()) {
+                if (productsGrid) productsGrid.innerHTML = '';
+                if (noProductsEl) noProductsEl.style.display = 'block';
+                if (productsPaginationBar) productsPaginationBar.style.display = 'none';
+                if (loader) loader.style.display = 'none';
+                return;
+            }
+            const q = query.trim();
+            try {
+                if (loader) loader.style.display = 'flex';
+                let filter = `PRODUTO.ilike.%${q}%`;
+                if (/^\d+$/.test(q)) {
+                    filter = `ID.eq.${q},PRODUTO.ilike.%${q}%`;
+                }
+                const { data, error } = await supabase.from('j-box').select('*').or(filter).limit(1000);
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    if (productsGrid) productsGrid.innerHTML = '';
+                    if (noProductsEl) noProductsEl.style.display = 'block';
+                    if (productsPaginationBar) productsPaginationBar.style.display = 'none';
+                    if (loader) loader.style.display = 'none';
+                    return;
+                }
+                if (noProductsEl) noProductsEl.style.display = 'none';
+                allProductsData = data;
+                currentProductPage = 1;
+                totalProductPages = Math.ceil(data.length / PRODUCTS_PER_PAGE);
+                renderProductsPage();
+                updateProductsPaginationInfo();
+                if (loader) loader.style.display = 'none';
+            } catch (err) {
+                console.error('Erro ao buscar produtos:', err);
+                alert('Erro ao buscar produtos: ' + (err.message || err));
+                if (loader) loader.style.display = 'none';
+            }
+        }
+
+        function getProductName(p) { return p.PRODUTO || p.produto || p.title || ''; }
+        function getProductPrice(p) { return p['PREÇO'] || p.PRECO || p.preco || '0'; }
+        function getProductDiscount(p) { return parseInt(p.DESCONTO || p.desconto || p.discount || 0) || 0; }
+        function getProductFirstImage(p) {
+            const urlStr = p['IMAGE-URL'] || p['IMAGE_URL'] || p.imageUrl || '';
+            if (!urlStr) return '';
+            const parts = urlStr.split('/@:/');
+            return parts[0] || urlStr;
+        }
+
+        function calculateDiscountedPrice(price, discount) {
+            const priceNum = parseFloat(String(price).replace(',', '.')) || 0;
+            const discountNum = Math.max(0, Math.min(100, discount || 0));
+            if (discountNum === 0) return priceNum;
+            return priceNum * (1 - discountNum / 100);
+        }
+
+        function renderProductsPage() {
+            if (!productsGrid) return;
+            productsGrid.innerHTML = '';
+            const start = (currentProductPage - 1) * PRODUCTS_PER_PAGE;
+            const end = start + PRODUCTS_PER_PAGE;
+            const pageItems = allProductsData.slice(start, end);
+
+            pageItems.forEach(prod => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                const img = getProductFirstImage(prod) || '';
+                const name = escapeHtml(getProductName(prod));
+                const priceRaw = getProductPrice(prod) || '0';
+                const discount = getProductDiscount(prod);
+                const priceNum = parseFloat(String(priceRaw).replace(',', '.')) || 0;
+                const discountedPrice = calculateDiscountedPrice(priceNum, discount);
+                const originalPriceFormatted = formatCurrency(priceNum);
+                const discountedPriceFormatted = formatCurrency(discountedPrice);
+                const imgHtml = img ? `<img class="product-card-image" src="${img}" alt="${name}">` : `<div class="product-card-image" style="display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;">Sem imagem</div>`;
+
+                let priceHtml = '';
+                if (discount > 0) {
+                    priceHtml = `
+                        <div class="product-card-original-price">${originalPriceFormatted}</div>
+                        <div class="product-card-discount-price">${discountedPriceFormatted}</div>
+                    `;
+                } else {
+                    priceHtml = `<div class="product-card-price">${originalPriceFormatted}</div>`;
+                }
+
+                card.innerHTML = `
+                    ${imgHtml}
+                    <div class="product-card-info">
+                        <div class="product-card-name">${name}</div>
+                        ${priceHtml}
+                    </div>
+                `;
+                card.addEventListener('click', () => openEditProductModal(prod));
+                productsGrid.appendChild(card);
+            });
+        }
+
+        function updateProductsPaginationInfo() {
+            if (productsPaginationInfo) {
+                productsPaginationInfo.textContent = `${currentProductPage} de ${totalProductPages}`;
+            }
+            if (productsPrevBtn) productsPrevBtn.disabled = currentProductPage === 1;
+            if (productsNextBtn) productsNextBtn.disabled = currentProductPage === totalProductPages;
+            if (productsPaginationBar) {
+                productsPaginationBar.style.display = totalProductPages > 1 ? 'flex' : 'none';
+            }
+        }
+
+        function goToProductPage(pageNumber) {
+            if (pageNumber < 1 || pageNumber > totalProductPages) return;
+            currentProductPage = pageNumber;
+            renderProductsPage();
+            updateProductsPaginationInfo();
+        }
+
+        function openEditProductModal(prod) {
+            if (!editProductModal) return;
+            currentEditingProductId = prod.ID || prod.id || null;
+            document.getElementById('editProductId').textContent = (prod.ID !== undefined ? String(prod.ID) : (prod.id !== undefined ? String(prod.id) : ''));
+            document.getElementById('editProductTitle').value = prod.PRODUTO || prod.produto || '';
+
+            // Formatar preço
+            const price = getProductPrice(prod) || '0';
+            const editPriceInput = document.getElementById('editProductPrice');
+            // Formatar corretamente para BRL: se vier "110", exibir "110,00"
+            let priceStr = String(price).replace('.', ',');
+            if (!priceStr.includes(',')) {
+                priceStr = priceStr + ',00';
+            }
+            editPriceInput.value = priceStr;
+
+            document.getElementById('editProductDescription').value = prod.DESCRIPTION || prod.description || '';
+
+            // Formatar desconto
+            const editDiscountInput = document.getElementById('editProductDiscount');
+            editDiscountInput.value = prod.DESCONTO || prod.desconto || '0';
+            formatDiscountInput(editDiscountInput);
+
+            const parcelamento = prod.PARCELAMENTO || prod.parcelamento || '';
+            const [installments, interestFree] = parcelamento ? parcelamento.split(',') : ['0', '0'];
+
+            // Formatar parcelas
+            const editInstallmentsInputEl = document.getElementById('editInstallments');
+            editInstallmentsInputEl.value = installments || '0';
+            formatInstallmentsInput(editInstallmentsInputEl);
+
+            // Formatar parcelas sem juros
+            const editInterestFreeInstallmentsInputEl = document.getElementById('editInterestFreeInstallments');
+            editInterestFreeInstallmentsInputEl.value = interestFree || '0';
+            formatInstallmentsInput(editInterestFreeInstallmentsInputEl);
+
+            const avail = !!prod.DISPONIBILIDADE;
+            document.getElementById('editProductAvailability').checked = avail;
+
+            // Carregar imagens existentes
+            const imageUrlStr = prod['IMAGE-URL'] || '';
+            editSelectedImages = [];
+            if (imageUrlStr) {
+                const urls = imageUrlStr.split('/@:/');
+                urls.forEach(url => {
+                    if (url && url.trim()) {
+                        editSelectedImages.push({ url: url.trim(), isExisting: true });
+                    }
+                });
+            }
+            renderEditImagesCarousel();
+
+            // Carregar modelos existentes com quantidades
+            const productModel = prod.product_model || '';
+            editSelectedModels = [];
+            if (productModel && productModel !== 'ÚNICO') {
+                const models = productModel.split(',').map(m => m.trim()).filter(Boolean);
+                editSelectedModels = models.map(m => {
+                    const parts = m.split('*');
+                    const name = parts[0] || m;
+                    const qty = parseInt(parts[1]) || 1;
+                    return { name: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(), qty };
+                });
+            }
+            renderEditModelBadges();
+
+            if (editModelInput) editModelInput.value = '';
+            editProductModal.style.display = 'flex';
+        }
+
+        function renderEditImagesCarousel() {
+            if (!editImagesTrack || !editImagesCarousel) return;
+            editImagesTrack.innerHTML = '';
+            if (!editSelectedImages || editSelectedImages.length === 0) {
+                editImagesCarousel.style.display = 'none';
+                return;
+            }
+            editImagesCarousel.style.display = 'flex';
+            editSelectedImages.forEach((imgObj, idx) => {
+                const item = document.createElement('div');
+                item.className = 'image-item';
+                const img = document.createElement('img');
+                img.src = imgObj.dataUrl || imgObj.url;
+                img.alt = `Prévia ${idx + 1}`;
+                img.loading = 'lazy';
+                item.appendChild(img);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'remove-image-btn';
+                btn.title = 'Remover';
+                btn.innerHTML = '&times;';
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    editSelectedImages.splice(idx, 1);
+                    renderEditImagesCarousel();
+                });
+                item.appendChild(btn);
+                editImagesTrack.appendChild(item);
+            });
+
+            // show/hide nav
+            if (editSelectedImages.length <= 1) {
+                if (editCarouselPrev) editCarouselPrev.style.display = 'none';
+                if (editCarouselNext) editCarouselNext.style.display = 'none';
+            } else {
+                if (editCarouselPrev) editCarouselPrev.style.display = 'flex';
+                if (editCarouselNext) editCarouselNext.style.display = 'flex';
+            }
+
+            // Inicializar drag-and-drop
+            initializeDragAndDropEdit();
+        }
+
+        function renderEditModelBadges() {
+            if (!editModelsContainer) return;
+            editModelsContainer.innerHTML = '';
+            editSelectedModels.forEach((modelObj, idx) => {
+                const badge = document.createElement('div');
+                badge.className = 'model-badge';
+                badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--modal-surface);border:1px solid var(--modal-border);font-weight:600;color:var(--modal-text);';
+
+                // Input de quantidade
+                const qtyInput = document.createElement('input');
+                qtyInput.type = 'number';
+                qtyInput.min = '1';
+                qtyInput.max = '999';
+                qtyInput.value = modelObj.qty;
+                qtyInput.style.cssText = 'width:40px;height:24px;padding:2px 4px;border:1px solid var(--modal-border);border-radius:4px;text-align:center;font-size:0.8rem;font-family:inherit;';
+                qtyInput.addEventListener('change', (e) => {
+                    const newQty = parseInt(e.target.value) || 1;
+                    modelObj.qty = Math.max(1, Math.min(999, newQty));
+                    e.target.value = modelObj.qty;
+                });
+
+                const text = document.createElement('span');
+                text.textContent = modelObj.name;
+                text.style.whiteSpace = 'nowrap';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'remove-model';
+                removeBtn.style.cssText = 'background:transparent;border:none;color:var(--modal-muted);cursor:pointer;font-weight:700;padding:0 4px;margin-left:2px;';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.addEventListener('click', () => {
+                    editSelectedModels.splice(idx, 1);
+                    renderEditModelBadges();
+                });
+
+                badge.appendChild(qtyInput);
+                badge.appendChild(text);
+                badge.appendChild(removeBtn);
+                editModelsContainer.appendChild(badge);
+            });
+        }
+
+        function addEditModelFromInput() {
+            if (!editModelInput) return;
+            const errEl = document.getElementById('editModelError');
+            if (errEl) errEl.style.display = 'none';
+            const val = editModelInput.value.trim();
+            if (!val) {
+                if (errEl) errEl.style.display = 'block';
+                return;
+            }
+            if (editSelectedModels.some(m => m.name.toLowerCase() === val.toLowerCase())) {
+                editModelInput.value = '';
+                return;
+            }
+            editSelectedModels.push({ name: val, qty: 1 });
+            renderEditModelBadges();
+            editModelInput.value = '';
+            editModelInput.focus();
+        }
+
+        function scrollEditCarousel(direction) {
+            if (!editImagesTrack) return;
+            const item = editImagesTrack.querySelector('.image-item');
+            const gap = 8;
+            const step = (item ? item.offsetWidth : 130) + gap;
+            editImagesTrack.scrollBy({ left: direction * step, behavior: 'smooth' });
+        }
+
+        async function addEditFiles(fileList) {
+            if (!fileList) return;
+            const files = Array.from(fileList);
+            for (const file of files) {
+                if (!file.type || !file.type.startsWith('image/')) continue;
+                if (editSelectedImages.length >= 9) break;
+                const dataUrl = await readFileAsDataURL(file);
+                editSelectedImages.push({ file, dataUrl });
+                renderEditImagesCarousel();
+            }
+        }
+
+        function closeEditProductModal() {
+            if (!editProductModal) return;
+            editProductModal.style.display = 'none';
+            if (editProductForm) editProductForm.reset();
+            editSelectedImages = [];
+            editSelectedModels = [];
+            currentEditingProductId = null;
+        }
+
+        // Event listeners para gerenciar imagens no editor
+        if (editDropZone) {
+            editDropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                editDropZone.classList.add('drag-over');
+            });
+            editDropZone.addEventListener('dragleave', () => {
+                editDropZone.classList.remove('drag-over');
+            });
+            editDropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                editDropZone.classList.remove('drag-over');
+                if (e.dataTransfer && e.dataTransfer.files) {
+                    addEditFiles(e.dataTransfer.files);
+                }
+            });
+        }
+
+        if (editProductImagesInput) {
+            editProductImagesInput.addEventListener('change', (e) => {
+                addEditFiles(e.target.files);
+                e.target.value = '';
+            });
+        }
+
+        if (editCarouselPrev) editCarouselPrev.addEventListener('click', () => scrollEditCarousel(-1));
+        if (editCarouselNext) editCarouselNext.addEventListener('click', () => scrollEditCarousel(1));
+
+        // Event listeners para modelos no editor
+        if (addEditModelBtn) addEditModelBtn.addEventListener('click', addEditModelFromInput);
+        if (editModelInput) editModelInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addEditModelFromInput();
+            }
+        });
+
+        editProductForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editProductId').textContent;
+            const title = document.getElementById('editProductTitle').value.trim();
+            const priceStr = document.getElementById('editProductPrice').value.replace(',', '.');
+            const price = parseFloat(priceStr) || 0;
+            const description = document.getElementById('editProductDescription').value;
+            const discount = document.getElementById('editProductDiscount').value || '0';
+            const installments = document.getElementById('editInstallments').value || '0';
+            const interestFreeInstallments = document.getElementById('editInterestFreeInstallments').value || '0';
+            const availability = document.getElementById('editProductAvailability').checked;
+
+            // Validar campos obrigatórios
+            if (!title) {
+                alert('Por favor, informe o nome do produto.');
+                return;
+            }
+
+            if (isNaN(price) || price < 1) {
+                alert('Por favor, informe um preço válido.');
+                return;
+            }
+
+            if (editSelectedModels.length === 0) {
+                document.getElementById('editModelError').style.display = 'block';
+                alert('Por favor, adicione pelo menos 1 modelo ao produto.');
+                return;
+            }
+
+            try {
+                const submitBtn = editProductForm.querySelector('.btn-submit');
+                const originalText = submitBtn.textContent;
+                let imageUrls = [];
+                let imageIds = [];
+
+                // Processar imagens novas (que têm arquivo) e manter as existentes
+                const existingImages = editSelectedImages.filter(img => img.isExisting).map(img => img.url);
+                const newImages = editSelectedImages.filter(img => !img.isExisting && img.file);
+
+                if (newImages.length > 0) {
+                    submitBtn.textContent = '⏳ Processando imagens...';
+                    submitBtn.disabled = true;
+
+                    for (let i = 0; i < newImages.length; i++) {
+                        const file = newImages[i].file;
+                        submitBtn.textContent = `⏳ Comprimindo imagem ${i + 1} de ${newImages.length}...`;
+                        const compressed = await compressImageToWebP(file);
+
+                        submitBtn.textContent = `⏳ Enviando imagem ${i + 1} de ${newImages.length}...`;
+                        const uploadResult = await uploadImageToImageKit(compressed);
+
+                        if (uploadResult) {
+                            imageUrls.push(uploadResult.url);
+                            imageIds.push(uploadResult.fileId);
+                        }
+                    }
+                }
+
+                // Combinar imagens existentes com novas
+                const allImageUrls = [...existingImages, ...imageUrls];
+                const allImageIds = editSelectedImages.filter(img => img.isExisting).map(() => '') || [];
+                allImageIds.push(...imageIds);
+
+                submitBtn.textContent = '⏳ Salvando...';
+
+                // Preparar string de modelos com quantidades
+                let modelsString = 'ÚNICO';
+                if (editSelectedModels && editSelectedModels.length > 0) {
+                    modelsString = editSelectedModels
+                        .slice()
+                        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+                        .map(m => m.name.toUpperCase() + '*' + m.qty)
+                        .join(',');
+                }
+
+                const updateObj = {
+                    PRODUTO: title,
+                    PREÇO: price.toString(),
+                    DESCRIPTION: description,
+                    DESCONTO: String(discount),
+                    PARCELAMENTO: `${installments},${interestFreeInstallments}`,
+                    DISPONIBILIDADE: availability,
+                    product_model: modelsString
+                };
+
+                // Atualizar imagens se houver novas
+                if (allImageUrls.length > 0) {
+                    updateObj['IMAGE-URL'] = allImageUrls.join('\\:@\\');
+                    updateObj['IMAGE-ID'] = allImageIds.join('\\:@\\');
+                }
+
+                const { error } = await supabase.from('j-box').update(updateObj).eq('ID', Number(id));
+                if (error) throw error;
+
+                alert('Produto atualizado com sucesso!');
+                closeEditProductModal();
+                const q = productSearchInput?.value || '';
+                if (q) searchProducts(q);
+
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            } catch (err) {
+                console.error('Erro ao atualizar produto:', err);
+                alert('Erro ao atualizar produto: ' + (err.message || err));
+                const submitBtn = editProductForm.querySelector('.btn-submit');
+                submitBtn.disabled = false;
+            }
+        });
+
+        deleteProductBtn?.addEventListener('click', async () => {
+            const id = document.getElementById('editProductId').textContent;
+            if (!id) return;
+            if (!confirm('Tem certeza que deseja excluir este produto? Esta ação é irreversível.')) return;
+            try {
+                const { error } = await supabase.from('j-box').delete().eq('ID', Number(id));
+                if (error) throw error;
+                alert('Produto excluído com sucesso.');
+                closeEditProductModal();
+                const q = productSearchInput?.value || '';
+                if (q) {
+                    searchProducts(q);
+                } else {
+                    allProductsData = [];
+                    currentProductPage = 1;
+                    totalProductPages = 1;
+                    if (productsGrid) productsGrid.innerHTML = '';
+                    if (productsPaginationBar) productsPaginationBar.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Erro ao excluir produto:', err);
+                alert('Erro ao excluir produto: ' + (err.message || err));
+            }
+        });
+
+        productSearchBtn?.addEventListener('click', () => searchProducts(productSearchInput.value));
+        productSearchInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchProducts(productSearchInput.value); });
+        productsPrevBtn?.addEventListener('click', () => goToProductPage(currentProductPage - 1));
+        productsNextBtn?.addEventListener('click', () => goToProductPage(currentProductPage + 1));
+        manageCloseBtn?.addEventListener('click', closeManageProductsModal);
+        manageCancelBtn?.addEventListener('click', closeManageProductsModal);
+        cancelEditBtn?.addEventListener('click', () => closeEditProductModal());
+        closeEditModalBtn?.addEventListener('click', () => closeEditProductModal());
+        window.addEventListener('click', (e) => { if (e.target === manageProductsModal) closeManageProductsModal(); if (e.target === editProductModal) closeEditProductModal(); });
+
+        // Atualizar display do email em diferentes tamanhos de tela
+        function updateUserEmailDisplay(email) {
+            const userEmail = document.getElementById('userEmail');
+            const userEmailShort = document.getElementById('userEmailShort');
+            const userEmailInitials = document.getElementById('userEmailInitials');
+
+            // Email completo (ex: usuario@email.com)
+            userEmail.textContent = email;
+            userEmailSpan.textContent = email;
+
+            // Versão curta - apenas a parte antes do @ (ex: usuario)
+            const emailName = email.split('@')[0];
+            userEmailShort.textContent = emailName;
+
+            // Iniciais - primeiras letras do nome (ex: U)
+            const initials = email
+                .split('@')[0]
+                .split(/[._-]/)
+                .map(part => part.charAt(0).toUpperCase())
+                .join('')
+                .substring(0, 2);
+            userEmailInitials.textContent = initials || 'U';
+        }
+
+        async function checkAuth() {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (!session) {
+                    // Não está logado, redirecionar para login
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                currentUser = session.user;
+                updateUserEmailDisplay(currentUser.email);
+                loadAdminContent();
+            } catch (error) {
+                redirectToLogin();
+            }
+        }
+
+
+
+        // ---------- Visualizador de Pedidos ----------
+        function formatOrderDateTime(createdAt) {
+            if (!createdAt) return '';
+            try {
+                const date = new Date(createdAt);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${day}/${month}/${year} às ${hours}:${minutes}`;
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function formatCPF(cpf) {
+            if (!cpf) return '';
+            const digits = String(cpf).replace(/\D/g, '');
+            if (digits.length !== 11) return cpf;
+            return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        }
+
+        function formatPhone(phone) {
+            if (!phone) return '';
+            const digits = String(phone).replace(/\D/g, '');
+            if (digits.length === 11) {
+                const ddd = digits.slice(0, 2);
+                const part1 = digits.slice(2, 7);
+                const part2 = digits.slice(7);
+                return `(${ddd}) ${part1}-${part2}`;
+            } else if (digits.length === 10) {
+                const ddd = digits.slice(0, 2);
+                const part1 = digits.slice(2, 6);
+                const part2 = digits.slice(6);
+                return `(${ddd}) ${part1}-${part2}`;
+            }
+            return phone;
+        }
+
+        function parseProducts(produto_nome_e_id) {
+            if (!produto_nome_e_id) return [];
+            const items = String(produto_nome_e_id).split(',').map(s => s.trim()).filter(Boolean);
+            return items.map(item => {
+                const idx = item.lastIndexOf('(');
+                let name = item;
+                let prodId = '';
+                let qty = '';
+                if (idx !== -1) {
+                    name = item.slice(0, idx).trim();
+                    const inside = item.slice(idx + 1, item.lastIndexOf(')'));
+                    if (inside) {
+                        const parts = inside.split('/').map(p => p.trim());
+                        prodId = parts[0] || '';
+                        qty = parts[1] || '';
+                    }
+                }
+                return { name, prodId, qty, raw: item };
+            });
+        }
+
+        function formatCurrency(value) {
+            if (value === null || value === undefined) return '';
+
+            let num;
+            if (typeof value === 'number') {
+                num = value;
+            } else {
+                const cleaned = String(value).replace(/\s/g, '').replace(/\./g, '').replace(',', '.').replace(/[^\d\.-]/g, '');
+                num = parseFloat(cleaned);
+            }
+
+            if (isNaN(num)) return value;
+            return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        async function updateOrderViewStatus(orderId, newViewStatus) {
+            try {
+                console.log('Atualizando pedido:', orderId, 'view:', newViewStatus);
+
+                const { data, error } = await supabase
+                    .from('pedidos_cps56')
+                    .update({ view: newViewStatus })
+                    .eq('id', orderId)
+                    .select();
+
+                if (error) {
+                    console.error('Erro Supabase:', error);
+                    alert(`Erro ao atualizar pedido: ${error.message}`);
+                    return false;
+                }
+
+                console.log('Pedido atualizado com sucesso:', data);
+                return true;
+            } catch (err) {
+                console.error('Erro inesperado:', err);
+                alert(`Erro inesperado: ${err.message}`);
+                return false;
+            }
+        }
+
+        // ===== CONFIRMAÇÃO SIMPLES =====
+        let pendingConfirm = null;
+        const reauthModal = document.getElementById('reauthModal');
+        const submitReauthBtn = document.getElementById('submitReauthBtn');
+        const cancelReauthBtn = document.getElementById('cancelReauthBtn');
+        const closeReauthModalBtn = document.getElementById('closeReauthModal');
+        const confirmMessageEl = document.getElementById('confirmMessage');
+
+        function openConfirmModal(orderId, newStatus, toggle, card) {
+            pendingConfirm = { orderId, newStatus, toggle, card };
+            const truncated = String(orderId).length > 8 ? String(orderId).substring(0, 8) + '...' : String(orderId);
+            confirmMessageEl.textContent = `Tem certeza que deseja marcar o pedido #${truncated} como ${newStatus ? 'Concluído' : 'Pendente'}?`;
+            reauthModal.style.display = 'flex';
+            if (toggle) toggle.disabled = true;
+        }
+
+        function closeConfirmModal(force = false) {
+            reauthModal.style.display = 'none';
+            if (pendingConfirm && pendingConfirm.toggle) {
+                pendingConfirm.toggle.disabled = false;
+                pendingConfirm.toggle.checked = !pendingConfirm.newStatus;
+            }
+            pendingConfirm = null;
+        }
+
+        // Confirmar ação
+        submitReauthBtn.addEventListener('click', async () => {
+            if (!pendingConfirm) { closeConfirmModal(true); return; }
+            submitReauthBtn.disabled = true;
+            const { orderId, newStatus, toggle, card } = pendingConfirm;
+            const success = await updateOrderViewStatus(orderId, newStatus);
+            if (success) {
+                if (card) {
+                    card.classList.toggle('viewed', newStatus);
+                    const labelText = card.querySelector('.order-status-text');
+                    if (labelText) labelText.textContent = newStatus ? 'Concluído' : 'Pendente';
+                }
+                if (toggle) toggle.checked = newStatus;
+                fetchOrders(currentOrderFilter);
+                closeConfirmModal(true);
+            } else {
+                if (toggle) toggle.checked = !newStatus;
+                alert('Erro ao atualizar o pedido');
+                closeConfirmModal(true);
+            }
+            submitReauthBtn.disabled = false;
+        });
+
+        // Cancelar / fechar
+        cancelReauthBtn.addEventListener('click', () => {
+            if (pendingConfirm && pendingConfirm.toggle) {
+                pendingConfirm.toggle.disabled = false;
+                pendingConfirm.toggle.checked = !pendingConfirm.newStatus;
+            }
+            closeConfirmModal(true);
+        });
+
+        closeReauthModalBtn.addEventListener('click', () => {
+            if (pendingConfirm && pendingConfirm.toggle) {
+                pendingConfirm.toggle.disabled = false;
+                pendingConfirm.toggle.checked = !pendingConfirm.newStatus;
+            }
+            closeConfirmModal(true);
+        });
+
+        // Fechar modal ao clicar fora
+        window.addEventListener('click', (event) => {
+            if (event.target === reauthModal) {
+                if (pendingConfirm && pendingConfirm.toggle) {
+                    pendingConfirm.toggle.disabled = false;
+                    pendingConfirm.toggle.checked = !pendingConfirm.newStatus;
+                }
+                closeConfirmModal(true);
+            }
+        });
+
+        // Variável global para rastrear o pedido expandido atualmente
+        let expandedOrderCard = null;
+        // Variável global para rastrear o filtro atual de pedidos
+        let currentOrderFilter = 'pending';
+        // Variáveis para paginação de pedidos
+        let currentOrderPage = 1;
+        let totalOrderPages = 1;
+        let allOrdersData = []; // Armazenar todos os pedidos para paginação
+
+        // Estado de paginação separado para cada filtro
+        let paginationState = {
+            'pending': { page: 1, data: [], totalPages: 1 },
+            'completed': { page: 1, data: [], totalPages: 1 },
+            'all': { page: 1, data: [], totalPages: 1 }
+        };
+
+        function updateOrdersNotificationBadge() {
+            const badge = document.getElementById('ordersNotificationBadge');
+            if (!badge) return;
+
+            // Buscar todos os pedidos do localStorage ou fazer fetch
+            const ordersList = document.getElementById('ordersList');
+            if (!ordersList) return;
+
+            // Contar pedidos pendentes (cards sem a classe 'viewed')
+            const pendingOrders = document.querySelectorAll('.order-card:not(.viewed)').length;
+
+            if (pendingOrders > 0) {
+                badge.textContent = pendingOrders;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+
+
+        async function fetchOrders(filterType) {
+            // Mostrar loader
+            const loader = document.getElementById('ordersLoader');
+            if (loader) loader.classList.add('show');
+            const loaderStartTime = Date.now(); // Registrar quando o loader aparece
+
+            const ordersList = document.getElementById('ordersList');
+            const ordersCountText = document.getElementById('ordersCountText');
+            if (ordersList) ordersList.innerHTML = '';
+
+            try {
+                const filter = filterType !== undefined ? filterType : currentOrderFilter;
+                if (filterType !== undefined) currentOrderFilter = filterType;
+
+                const viewValue = filter === 'pending' ? false : true;
+
+                // Fazer 2 requisições em paralelo: 1) contar pendentes e concluídos, 2) buscar dados do filtro
+                const [countResult, dataResult] = await Promise.all([
+                    // 1ª requisição: Contar pendentes e concluídos em paralelo
+                    Promise.all([
+                        supabase.from('pedidos_cps56').select('*', { count: 'exact', head: true }).eq('view', false),
+                        supabase.from('pedidos_cps56').select('*', { count: 'exact', head: true }).eq('view', true)
+                    ]),
+                    // 2ª requisição: Buscar dados do filtro atual
+                    supabase
+                        .from('pedidos_cps56')
+                        .select('*')
+                        .eq('view', viewValue)
+                        .order('created_at', { ascending: filter === 'pending' })
+                        .limit(800)
+                ]);
+
+                // Processar contagens
+                const [pendingRes, completedRes] = countResult;
+                const pendingCount = (!pendingRes.error) ? pendingRes.count : 0;
+                const completedCount = (!completedRes.error) ? completedRes.count : 0;
+
+                // Processar dados do filtro
+                const { data, error } = dataResult;
+                if (error) {
+                    if (ordersList) ordersList.innerHTML = `<div class="no-results">Erro ao carregar pedidos: ${error.message}</div>`;
+                    if (ordersCountText) ordersCountText.textContent = 'Erro';
+
+                    // Calcular tempo decorrido e esperar se necessário (mínimo 1.5s)
+                    const elapsedTime = Date.now() - loaderStartTime;
+                    const minLoaderTime = 1500; // 1.5 segundos em ms
+                    const remainingTime = Math.max(0, minLoaderTime - elapsedTime);
+
+                    if (remainingTime > 0) {
+                        await new Promise(resolve => setTimeout(resolve, remainingTime));
+                    }
+
+                    // Esconder loader
+                    if (loader) loader.classList.remove('show');
+                    return;
+                }
+
+                const orders = data || [];
+
+                // Atualizar texto de contagem
+                if (ordersCountText) {
+                    const total = pendingCount + completedCount;
+                    ordersCountText.innerHTML = `${total} ped. · <span style="color: #16a34a; font-weight: 600;">${completedCount} concl.</span> · <span style="color: #e53935; font-weight: 600;">${pendingCount} pend.</span>`;
+                }
+
+                // Atualizar badge de notificação com pedidos pendentes
+                const notificationBadge = document.getElementById('ordersNotificationBadge');
+                if (notificationBadge) {
+                    if (pendingCount > 0) {
+                        notificationBadge.textContent = pendingCount;
+                        notificationBadge.classList.remove('hidden');
+                    } else {
+                        notificationBadge.classList.add('hidden');
+                    }
+                }
+
+                // Atualizar estado de paginação com os pedidos retornados (no máximo 800)
+                const itemsPerPage = 4;
+                const displayOrders = orders.slice();
+                paginationState[filter].data = displayOrders;
+                paginationState[filter].totalPages = Math.ceil(Math.max(1, displayOrders.length) / itemsPerPage);
+
+                currentOrderPage = paginationState[filter].page;
+                totalOrderPages = paginationState[filter].totalPages;
+
+                if (currentOrderPage > totalOrderPages) {
+                    currentOrderPage = 1;
+                    paginationState[filter].page = 1;
+                }
+
+                allOrdersData = displayOrders;
+
+                updatePaginationInfo();
+
+                if (!displayOrders || displayOrders.length === 0) {
+                    const empty = document.getElementById('ordersEmpty');
+                    if (empty) empty.style.display = 'block';
+                    if (ordersList) ordersList.innerHTML = '';
+
+                    // Calcular tempo decorrido e esperar se necessário (mínimo 1.5s)
+                    const elapsedTime = Date.now() - loaderStartTime;
+                    const minLoaderTime = 1500; // 1.5 segundos em ms
+                    const remainingTime = Math.max(0, minLoaderTime - elapsedTime);
+
+                    if (remainingTime > 0) {
+                        await new Promise(resolve => setTimeout(resolve, remainingTime));
+                    }
+
+                    // Esconder loader
+                    if (loader) loader.classList.remove('show');
+                    return;
+                } else {
+                    const empty = document.getElementById('ordersEmpty');
+                    if (empty) empty.style.display = 'none';
+                }
+
+                renderOrdersPage();
+
+                // Calcular tempo decorrido e esperar se necessário (mínimo 1.5s)
+                const elapsedTime = Date.now() - loaderStartTime;
+                const minLoaderTime = 1500; // 1.5 segundos em ms
+                const remainingTime = Math.max(0, minLoaderTime - elapsedTime);
+
+                if (remainingTime > 0) {
+                    await new Promise(resolve => setTimeout(resolve, remainingTime));
+                }
+
+                // Esconder loader
+                if (loader) loader.classList.remove('show');
+
+                // (Removed old direct-update listeners here.)
+            } catch (err) {
+                const ordersListEl = document.getElementById('ordersList');
+                if (ordersListEl) ordersListEl.innerHTML = `<div class="no-results">Erro inesperado: ${err.message}</div>`;
+
+                // Calcular tempo decorrido e esperar se necessário (mínimo 1.5s)
+                const elapsedTime = Date.now() - loaderStartTime;
+                const minLoaderTime = 1500; // 1.5 segundos em ms
+                const remainingTime = Math.max(0, minLoaderTime - elapsedTime);
+
+                if (remainingTime > 0) {
+                    await new Promise(resolve => setTimeout(resolve, remainingTime));
+                }
+
+                // Esconder loader em caso de erro
+                const loader = document.getElementById('ordersLoader');
+                if (loader) loader.classList.remove('show');
+            }
+        }
+
+        function renderOrdersPage() {
+            const ordersList = document.getElementById('ordersList');
+            if (!ordersList) return;
+
+            const itemsPerPage = 4;
+            const startIndex = (currentOrderPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedOrders = allOrdersData.slice(startIndex, endIndex);
+
+            ordersList.innerHTML = '';
+
+            paginatedOrders.forEach(order => {
+                const produtos = parseProducts(order.produto_nome_e_id || order.produto_nome || '');
+                const pedidoTotal = formatCurrency(order.produto_valor || order.total || '');
+                const clienteNome = order.cliente_nome || '';
+                const clienteTel = formatPhone(order.cliente_telefone || '');
+                const clienteCpf = formatCPF(order.cliente_cpf || '');
+                const clienteEmail = order.cliente_email || '';
+                const clienteEndereco = order.cliente_endereco || '';
+                const isViewed = order.view || false;
+
+                const prodTableRows = produtos.map(p => `
+                    <tr>
+                        <td>${escapeHtml(p.name)}</td>
+                        <td>${escapeHtml(p.prodId)}</td>
+                        <td style="text-align:center;">${escapeHtml(p.qty)}</td>
+                    </tr>
+                `).join('');
+
+                const card = document.createElement('div');
+                card.className = `order-card ${isViewed ? 'viewed completed' : ''}`;
+                const truncatedId = String(order.id).substring(0, 4) + '...';
+                card.innerHTML = `
+                    <div class="order-header">
+                        <div class="order-header-left">
+                            <div class="order-toggle-icon">▼</div>
+                            <div class="order-summary">
+                                <div class="order-id-badge">#${escapeHtml(truncatedId)}</div>
+                                <div class="order-client-name">${escapeHtml(clienteNome)}</div>
+                            </div>
+                        </div>
+                        <div class="order-header-right">
+                            <div class="order-price">${pedidoTotal}</div>
+                            <label class="order-status-toggle" style="margin:0;cursor:pointer;" onclick="event.stopPropagation();">
+                                <div class="toggle-switch">
+                                    <input type="checkbox" class="order-view-toggle" data-order-id="${escapeHtml(order.id)}" ${isViewed ? 'checked' : ''}>
+                                    <div class="toggle-track"></div>
+                                </div>
+                                <span class="order-status-text">${isViewed ? 'Concluído' : 'Pendente'}</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="order-content">
+                        <div class="order-content-inner">
+                            <div class="order-section">
+                                <div class="order-section-title">Produtos</div>
+                                <div class="order-products">
+                                    <table class="order-products-table" role="table" aria-label="Produtos do pedido">
+                                        <thead>
+                                            <tr>
+                                                <th>Produto</th>
+                                                <th>ID</th>
+                                                <th style="text-align:center;">Qtd</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${prodTableRows}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="order-section">
+                                <div class="order-section-title">Informações do Cliente</div>
+                                <div class="order-info-table-container">
+                                    <table class="order-info-table" role="table" aria-label="Informações do Cliente">
+                                        <tbody>
+                                            <tr><td class="label">Nome</td><td class="value">${escapeHtml(clienteNome)}</td></tr>
+                                            <tr><td class="label">Telefone</td><td class="value">${escapeHtml(clienteTel)}</td></tr>
+                                            <tr><td class="label">Email</td><td class="value">${escapeHtml(clienteEmail)}</td></tr>
+                                            <tr><td class="label">CPF</td><td class="value">${escapeHtml(clienteCpf)}</td></tr>
+                                            <tr><td class="label">Endereço</td><td class="value">${escapeHtml(clienteEndereco)}</td></tr>
+                                            <tr><td class="label">Total</td><td class="value">${pedidoTotal}</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="order-datetime">${formatOrderDateTime(order.created_at)}</div>
+                        </div>
+                    </div>
+                `;
+
+                // Event listener para expandir/recolher com scroll suave
+                const header = card.querySelector('.order-header');
+                header.addEventListener('click', () => {
+                    // Se há um pedido expandido diferente do atual, fecha primeiro
+                    if (expandedOrderCard && expandedOrderCard !== card) {
+                        expandedOrderCard.classList.remove('expanded');
+                    }
+
+                    // Detectar se vamos expandir (antes da toggle)
+                    const willExpand = !card.classList.contains('expanded');
+
+                    // Alterna o estado do pedido clicado
+                    card.classList.toggle('expanded');
+
+                    // Atualiza a referência do pedido expandido
+                    expandedOrderCard = card.classList.contains('expanded') ? card : null;
+
+                    if (willExpand) {
+                        // Rolagem suave para deixar o pedido em uma área confortável do modal
+                        const modalBody = document.querySelector('#ordersModal .modal-body');
+                        if (modalBody) {
+                            // Delay curto para permitir que a expansão ajuste o layout (transição de max-height)
+                            setTimeout(() => {
+                                const modalRect = modalBody.getBoundingClientRect();
+                                const cardRect = card.getBoundingClientRect();
+
+                                // Distância do topo do modal até o topo do card
+                                const topOffset = cardRect.top - modalRect.top;
+                                const margin = 16; // px de folga
+
+                                const maxScroll = modalBody.scrollHeight - modalBody.clientHeight;
+                                let target = modalBody.scrollTop + topOffset - margin;
+                                if (target < 0) target = 0;
+                                if (target > maxScroll) target = maxScroll;
+
+                                modalBody.scrollTo({ top: target, behavior: 'smooth' });
+
+                                // Garantir que a parte inferior do card expandido também fique visível
+                                const cardBottom = (cardRect.bottom - modalRect.top) + modalBody.scrollTop;
+                                if (cardBottom > modalBody.scrollTop + modalBody.clientHeight) {
+                                    const bottomTarget = Math.min(cardBottom - modalBody.clientHeight + margin, maxScroll);
+                                    modalBody.scrollTo({ top: bottomTarget, behavior: 'smooth' });
+                                }
+                            }, 200);
+                        }
+                    }
+                });
+
+                ordersList.appendChild(card);
+            });
+
+            // Atualizar informações de paginação
+            updatePaginationInfo();
+
+            // Adicionar event listeners aos toggles (abre modal de confirmação)
+            document.querySelectorAll('.order-view-toggle').forEach(toggle => {
+                toggle.addEventListener('change', (e) => {
+                    const orderId = toggle.getAttribute('data-order-id');
+                    const newStatus = toggle.checked;
+                    const card = toggle.closest('.order-card');
+
+                    // Reverter o checkbox e abrir modal de confirmação
+                    toggle.checked = !newStatus;
+                    toggle.disabled = true;
+                    openConfirmModal(orderId, newStatus, toggle, card);
+                });
+            });
+        }
+
+        function updatePaginationInfo() {
+            const paginationInfo = document.getElementById('paginationInfo');
+            const btnPrevPage = document.getElementById('btnPrevPage');
+            const btnNextPage = document.getElementById('btnNextPage');
+
+            if (paginationInfo) {
+                paginationInfo.textContent = `${currentOrderPage} de ${totalOrderPages}`;
+            }
+
+            if (btnPrevPage) {
+                btnPrevPage.disabled = currentOrderPage <= 1;
+            }
+
+            if (btnNextPage) {
+                btnNextPage.disabled = currentOrderPage >= totalOrderPages;
+            }
+        }
+
+        function goToOrderPage(pageNumber) {
+            if (pageNumber < 1 || pageNumber > totalOrderPages) return;
+
+            currentOrderPage = pageNumber;
+            // Salvar página atual no estado do filtro
+            paginationState[currentOrderFilter].page = pageNumber;
+
+            renderOrdersPage();
+
+            // Scroll to top do modal
+            const modalBody = document.querySelector('#ordersModal .modal-body');
+            if (modalBody) {
+                modalBody.scrollTop = 0;
+            }
+        }
+
+        function openOrdersModal() {
+            const ordersModal = document.getElementById('ordersModal');
+            if (ordersModal) ordersModal.style.display = 'flex';
+            // Definir filtro padrão para pedidos pendentes ao abrir
+            currentOrderFilter = 'pending';
+
+            // Resetar paginação para a primeira página ao abrir o modal
+            currentOrderPage = 1;
+            if (paginationState && paginationState[currentOrderFilter]) {
+                paginationState[currentOrderFilter].page = 1;
+            } else if (paginationState) {
+                paginationState[currentOrderFilter] = { page: 1, data: [], totalPages: 1 };
+            }
+
+            // Resetar estado do dropdown Vue
+            if (filterDropdownApp && filterDropdownApp.$data) {
+                filterDropdownApp.$data.selectedValue = 'pending';
+                filterDropdownApp.$data.selectedLabel = 'Pedidos pendentes';
+                filterDropdownApp.$data.isOpen = false;
+            }
+
+            const ordersFilterEl = document.getElementById('ordersFilter');
+            if (ordersFilterEl) ordersFilterEl.value = 'pending';
+            fetchOrders('pending');
+        }
+
+        function changeOrderFilter(filterValue) {
+            // Atualizar a variável global do filtro
+            currentOrderFilter = filterValue;
+
+            // Se o componente Vue do dropdown existir, atualizar seu estado
+            if (filterDropdownApp && filterDropdownApp.$data) {
+                filterDropdownApp.$data.selectedValue = filterValue;
+                filterDropdownApp.$data.selectedLabel = filterValue === 'pending' ? 'Pedidos pendentes' : 'Pedidos concluídos';
+            }
+
+            // Recarregar os pedidos com o novo filtro
+            fetchOrders(filterValue);
+        }
+
+        // Event listeners para paginação
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnPrevPage = document.getElementById('btnPrevPage');
+            const btnNextPage = document.getElementById('btnNextPage');
+
+            if (btnPrevPage) {
+                btnPrevPage.addEventListener('click', () => {
+                    goToOrderPage(currentOrderPage - 1);
+                });
+            }
+
+            if (btnNextPage) {
+                btnNextPage.addEventListener('click', () => {
+                    goToOrderPage(currentOrderPage + 1);
+                });
+            }
+        });
+
+        // Adicionar event listeners após a página carregar
+        window.addEventListener('load', () => {
+            const btnPrevPage = document.getElementById('btnPrevPage');
+            const btnNextPage = document.getElementById('btnNextPage');
+
+            if (btnPrevPage) {
+                btnPrevPage.addEventListener('click', () => {
+                    goToOrderPage(currentOrderPage - 1);
+                });
+            }
+
+            if (btnNextPage) {
+                btnNextPage.addEventListener('click', () => {
+                    goToOrderPage(currentOrderPage + 1);
+                });
+            }
+        });
+
+        function closeOrdersModal() {
+            const ordersModal = document.getElementById('ordersModal');
+            if (ordersModal) ordersModal.style.display = 'none';
+            const list = document.getElementById('ordersList');
+            if (list) list.innerHTML = '';
+        }
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        document.addEventListener('click', function (e) {
+            if (e.target && e.target.id === 'closeOrdersModal') closeOrdersModal();
+            if (e.target && e.target.id === 'btnCloseOrdersFooter') closeOrdersModal();
+        });
+
+        window.addEventListener('click', (event) => {
+            const ordersModal = document.getElementById('ordersModal');
+            if (event.target === ordersModal) closeOrdersModal();
+        });
+
+        function redirectToLogin() {
+            window.location.href = 'login.html';
+        }
+
+        // Logout
+        btnLogout.addEventListener('click', async () => {
+            try {
+                await supabase.auth.signOut();
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminUser');
+                window.location.href = 'login.html';
+            } catch (error) {
+                alert('Erro ao fazer logout');
+            }
+        });
+
+        // Monitorar mudanças de autenticação
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_OUT') {
+                redirectToLogin();
+            }
+        });
+
+        // ===== Event listeners globais para drag-and-drop =====
+        document.addEventListener('mousemove', (e) => {
+            if (dragStatePublish.isDragging) handleDragMovePublish(e);
+            if (dragStateEdit.isDragging) handleDragMoveEdit(e);
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (dragStatePublish.isDragging) handleDragEndPublish(e);
+            if (dragStateEdit.isDragging) handleDragEndEdit(e);
+        });
+
+        // Verificar autenticação ao carregar a página
+        checkAuth();
+
+        async function deleteOldImage(fileId) {
+            try {
+                // Acionamos o backend (Edge Function) para contornar o bloqueio de segurança
+                const { data, error } = await supabase.functions.invoke('delete-imagekit', {
+                    body: {
+                        fileId: fileId,
+                        privateKey: imagekitCredentials.private_key
+                    }
+                });
+
+                if (error) throw error;
+            } catch (err) {
+                // Erro silencioso ao remover imagem (não afeta o fluxo principal)
+            }
+        }
+
+        // ===== VUE CUSTOM DROPDOWN COMPONENT =====
+        const { createApp } = Vue;
+
+        const OrderFilterDropdown = {
+            template: `
+                <div class="custom-dropdown">
+                    <button 
+                        class="dropdown-trigger" 
+                        :class="{ active: isOpen }"
+                        @click="toggleDropdown"
+                        type="button"
+                    >
+                        <span>{{ selectedLabel }}</span>
+                        <i class="ri-arrow-down-s-line dropdown-icon"></i>
+                    </button>
+                    <div class="dropdown-menu" v-if="isOpen" @click.stop>
+                        <div 
+                            v-for="option in options" 
+                            :key="option.value"
+                            class="dropdown-item"
+                            :class="{ selected: selectedValue === option.value }"
+                            @click="selectOption(option)"
+                        >
+                            {{ option.label }}
+                        </div>
+                    </div>
+                </div>
+            `,
+            data() {
+                return {
+                    isOpen: false,
+                    selectedValue: 'pending',
+                    selectedLabel: 'Pedidos pendentes',
+                    options: [
+                        { label: 'Pedidos pendentes', value: 'pending' },
+                        { label: 'Pedidos concluídos', value: 'completed' }
+                    ]
+                };
+            },
+            methods: {
+                toggleDropdown() {
+                    this.isOpen = !this.isOpen;
+                },
+                selectOption(option) {
+                    this.selectedValue = option.value;
+                    this.selectedLabel = option.label;
+                    this.isOpen = false;
+
+                    // Atualizar a variável global de filtro
+                    currentOrderFilter = option.value;
+
+                    // Disparar evento customizado para integrar com código existente
+                    const event = new CustomEvent('filterChange', {
+                        detail: { filter: option.value }
+                    });
+                    document.getElementById('ordersFilterBar').dispatchEvent(event);
+
+                    // Se a função fetchOrders existe, chamar com novo filtro
+                    if (typeof fetchOrders === 'function') {
+                        fetchOrders(option.value);
+                    }
+                }
+            },
+            mounted() {
+                // Fechar dropdown ao clicar fora em todos os tamanhos
+                const clickOutsideHandler = (event) => {
+                    const dropdown = this.$el;
+                    if (dropdown && !dropdown.contains(event.target)) {
+                        this.isOpen = false;
+                    }
+                };
+
+                document.addEventListener('click', clickOutsideHandler);
+
+                this.$watch(() => this.$el, () => {
+                    this.$nextTick(() => {
+                        document.addEventListener('click', clickOutsideHandler);
+                    });
+                });
+            }
+        };
+
+        // Montar componente Vue quando o modal de pedidos for aberto
+        let filterDropdownApp = null;
+        const originalOpenOrdersModal = window.openOrdersModal || function () { };
+
+        window.openOrdersModal = function () {
+            originalOpenOrdersModal.apply(this, arguments);
+
+            // Montar componente Vue se ainda não estiver montado
+            setTimeout(() => {
+                const filterContainer = document.getElementById('filterDropdown');
+                if (filterContainer && !filterDropdownApp) {
+                    filterDropdownApp = createApp(OrderFilterDropdown).mount(filterContainer);
+                }
+            }, 100);
+        };
+
+    </script>
+</body>
+
+</html>

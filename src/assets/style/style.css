@@ -1,0 +1,51 @@
+/* ----------------------------------------------
+   MAIN STYLESHEET - Imports All Modules
+---------------------------------------------- */
+
+/* Design Tokens */
+@import url('./variables.css');
+
+/* Base Styles */
+@import url('./reset.css');
+
+/* Animations & Loading States */
+@import url('./skeleton.css');
+
+/* Layout Structure */
+@import url('./layout.css');
+
+/* Components */
+@import url('./header.css');
+@import url('./banner.css');
+@import url('./profile.css');
+@import url('./search.css');
+
+/* Responsive Design */
+@import url('./responsive.css');
+
+.external-category-loader {
+   position: fixed;
+   inset: 0;
+   z-index: 9999;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   background: rgba(255, 255, 255, 0.35);
+   backdrop-filter: blur(8px);
+   -webkit-backdrop-filter: blur(8px);
+}
+
+.external-category-loader__spinner {
+   width: 56px;
+   height: 56px;
+   border-radius: 50%;
+   border: 4px solid rgba(17, 17, 17, 0.15);
+   border-top-color: #111;
+   animation: external-category-spin 0.9s linear infinite;
+}
+
+@keyframes external-category-spin {
+   to {
+      transform: rotate(360deg);
+   }
+}

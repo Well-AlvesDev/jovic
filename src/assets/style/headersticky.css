@@ -1,0 +1,84 @@
+/* ══════════════════════════════════════════════
+   STICKY LOGO NO HEADER (adicionado a header.css)
+══════════════════════════════════════════════ */
+
+/* Container central que hospeda o logo quando fixado */
+.header-inner {
+    position: relative;
+}
+
+.header-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.app-header {
+    z-index: 100;
+}
+
+.menu-toggle,
+.cart-button {
+    position: relative;
+    z-index: 2;
+}
+
+.header-logo-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: max-content;
+}
+
+/* Avatar circular fixado na nav */
+.header-sticky-logo {
+    width: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--bg-surface, #fff);
+    box-shadow: var(--shadow-card, 0 1px 4px rgba(0, 0, 0, .12));
+
+}
+
+/* Fallback quando não há logo: exibe o nome da loja */
+.header-sticky-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+/* ── Transição Vue (header-logo) ─────────────────── */
+/* Entrada: logo desce suavemente do topo */
+.header-logo-enter-active {
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+/* Saída: logo some subindo */
+.header-logo-leave-active {
+    transition: opacity 0.10s ease, transform 0.10s ease;
+}
+
+.header-logo-enter-from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.85);
+}
+
+.header-logo-leave-to {
+    opacity: 0;
+    transform: translateY(-40px) scale(1);
+}
+
+.header-logo-enter-to,
+.header-logo-leave-from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}

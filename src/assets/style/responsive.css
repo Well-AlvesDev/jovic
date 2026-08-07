@@ -1,0 +1,48 @@
+/* ══════════════════════════════════════════════
+   RESPONSIVE DESIGN
+══════════════════════════════════════════════ */
+
+/* Tablets (480px+) */
+@media (min-width: 480px) {
+
+    .banner-img,
+    .banner-placeholder,
+    .skeleton-banner {
+        height: 230px;
+    }
+
+    .store-name {
+        font-size: 22px;
+    }
+
+    .strip-title {
+        font-size: 11px;
+    }
+
+    .payment-pill {
+        width: 40px;
+        height: 22px;
+    }
+}
+
+/* Desktops (720px+) */
+@media (min-width: 720px) {
+
+    .store-banner,
+    .search-tabs-wrap {
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+        margin-top: 16px;
+    }
+
+    .banner-img,
+    .banner-placeholder,
+    .skeleton-banner {
+        height: 335px;
+    }
+
+    .store-name {
+        font-size: 24px;
+    }
+}
