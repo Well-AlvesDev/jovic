@@ -39,7 +39,7 @@ export default {
     // ── Computed ─────────────────────────────────────────────────
     const whatsappLink = computed(() => {
       const text = encodeURIComponent(`Olá! Vim pelo link da loja ${props.storeName}.`);
-      return `https://wa.me/5581993862428?text=${text}`;
+      return `https://wa.me/5581993609366?text=${text}`;
     });
 
     const formattedInstagramUrl = computed(() => {
