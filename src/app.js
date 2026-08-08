@@ -157,9 +157,26 @@ createApp({
       menuOpen.value = false;
     }
 
+    function removeCategoryQueryFromUrl() {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('category')) {
+        return;
+      }
+
+      url.search = '';
+      url.pathname = url.pathname.endsWith('index.html') ? url.pathname : '/index.html';
+      history.replaceState(null, '', url.toString());
+    }
+
     // Recebe o evento do StoreBanner e atualiza o estado
     function onLogoSticky(val) {
       logoSticky.value = val;
+    }
+
+    function clearSearch() {
+      searchQuery.value = '';
+      activeCategory.value = 'TODAS';
+      removeCategoryQueryFromUrl();
     }
 
     return {

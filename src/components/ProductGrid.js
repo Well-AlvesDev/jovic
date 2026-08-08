@@ -281,13 +281,33 @@ export default {
                     </template>
                 </h2>
                 
-                <div v-if="isLoadingProducts" class="loading-message">
-                    <p>Carregando produtos...</p>
+                <div v-if="isLoadingProducts" class="products-grid">
+                    <div
+                        v-for="n in 12"
+                        :key="n"
+                        class="product-card product-skeleton-card"
+                    >
+                        <div class="product-image-wrapper">
+                            <div class="skeleton product-skeleton-image"></div>
+                        </div>
+                        <div class="product-info">
+                            <div class="skeleton product-skeleton-title"></div>
+                            <div class="skeleton product-skeleton-desc"></div>
+                            <div class="skeleton product-skeleton-desc short"></div>
+                            <div class="product-footer">
+                                <div class="product-price-block">
+                                    <div class="skeleton product-skeleton-price-old"></div>
+                                    <div class="skeleton product-skeleton-price"></div>
+                                </div>
+                                <div class="skeleton product-skeleton-button"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div v-else-if="error" class="error-message">
                     <p>⚠️ {{ error }}</p>
-                    <p style="font-size: 12px; margin-top: 8px;">Verifique se as credenciais do Supabase estão configuradas corretamente no componente.</p>
+                    <p style="font-size: 12px; margin-top: 8px;">Verifique sua conexão com a internet. </p>
                 </div>
                 
                 <div v-else-if="filteredProducts.length === 0" class="empty-message">
