@@ -509,6 +509,110 @@ button {
   white-space: pre-line;
 }
 
+/* Tamanho */
+.detail-size-block {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.detail-size-dropdown {
+  position: relative;
+  margin-top: 8px;
+}
+
+.detail-size-trigger {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.detail-size-trigger:hover,
+.detail-size-dropdown--open .detail-size-trigger {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.detail-size-arrow {
+  font-size: 18px;
+  transition: transform var(--transition);
+}
+
+.detail-size-dropdown--open .detail-size-arrow {
+  transform: rotate(180deg);
+}
+
+.detail-size-options {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-page);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+  list-style: none;
+  padding: 8px 0;
+}
+
+.detail-size-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.detail-size-option:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.detail-size-option--selected {
+  font-weight: 700;
+  background: rgba(28, 72, 166, 0.08);
+}
+
+.detail-size-option--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.detail-size-option-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-size-option-qty {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.detail-size-note {
+  display: block;
+  margin-top: 8px;
+  color: #d0454c;
+  font-size: 13px;
+}
+
 /* Quantidade */
 .detail-qty-block {
   margin-top: 22px;

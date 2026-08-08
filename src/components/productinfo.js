@@ -52,6 +52,40 @@ export default {
       }
       return '';
     },
+    sizeOptions() {
+      const rawModel = String(this.product?.product_model || this.product?.PRODUCT_MODEL || '').trim();
+      if (!rawModel) return [];
+
+      return rawModel
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => {
+          const [label = '', qty = '0'] = item.split('*').map((part) => part.trim());
+          const quantity = Number.isNaN(Number(qty)) ? 0 : Number(qty);
+          return {
+            label: label || 'Sem tamanho',
+            quantity,
+          };
+        });
+    },
+    selectedSizeData() {
+      return this.sizeOptions.find((option) => option.label === this.selectedSize) || this.sizeOptions[0] || null;
+    },
+    selectedSizeAvailable() {
+      return this.selectedSizeData?.quantity ?? null;
+    },
+  },
+  watch: {
+    product() {
+      this.syncSelectedSize();
+    },
+  },
+  mounted() {
+    document.addEventListener('click', this.onDocumentClick);
+  },
+  beforeUnmount() {
+    document.removeEventListener('click', this.onDocumentClick);
   },
   template: `
     <div class="product-info-panel">
@@ -102,6 +136,44 @@ export default {
           <p class="detail-description-text">{{ product.DESCRIPTION }}</p>
         </div>
 
+        <!-- Tamanho -->
+        <div v-if="sizeOptions.length" class="detail-size-block">
+          <span class="detail-section-label">Tamanho</span>
+          <div class="detail-size-dropdown" :class="{ 'detail-size-dropdown--open': sizeDropdownOpen }">
+            <button
+              type="button"
+              class="detail-size-trigger"
+              @click.prevent="toggleSizeDropdown"
+              :aria-expanded="sizeDropdownOpen.toString()"
+              aria-haspopup="listbox"
+            >
+              <span>{{ selectedSize || 'Selecione um tamanho' }}</span>
+              <i class="ri-arrow-down-s-line detail-size-arrow"></i>
+            </button>
+
+            <ul v-if="sizeDropdownOpen" class="detail-size-options" role="listbox">
+              <li
+                v-for="option in sizeOptions"
+                :key="option.label"
+                class="detail-size-option"
+                :class="{
+                  'detail-size-option--disabled': option.quantity <= 0,
+                  'detail-size-option--selected': option.label === selectedSize,
+                }"
+                role="option"
+                :aria-selected="option.label === selectedSize"
+                @click="selectSize(option)"
+              >
+                <span class="detail-size-option-label">{{ option.label }}</span>
+                <span class="detail-size-option-qty">{{ option.quantity }} disponível</span>
+              </li>
+            </ul>
+          </div>
+          <span v-if="selectedSizeAvailable === 0" class="detail-size-note">
+            Tamanho selecionado sem estoque.
+          </span>
+        </div>
+
         <!-- Quantidade -->
         <div class="detail-qty-block">
           <span class="detail-section-label">Quantidade</span>
@@ -118,6 +190,7 @@ export default {
             <button
               class="qty-btn"
               @click="$emit('increase-qty')"
+              :disabled="selectedSizeAvailable !== null && quantity >= selectedSizeAvailable"
               aria-label="Aumentar quantidade"
             >
               <i class="ri-add-line"></i>
@@ -177,7 +250,11 @@ export default {
     </div>
   `,
   data() {
-    return { copied: false };
+    return {
+      copied: false,
+      selectedSize: null,
+      sizeDropdownOpen: false,
+    };
   },
   methods: {
     copyLink() {
@@ -187,5 +264,25 @@ export default {
         setTimeout(() => { this.copied = false; }, 2000);
       });
     },
-  },
+    syncSelectedSize() {
+      this.selectedSize = null;
+    },
+    toggleSizeDropdown() {
+      this.sizeDropdownOpen = !this.sizeDropdownOpen;
+    },
+    closeSizeDropdown() {
+      this.sizeDropdownOpen = false;
+    },
+    selectSize(option) {
+      if (option.quantity <= 0) return;
+      this.selectedSize = option.label;
+      this.$emit('size-selected', { label: option.label, quantity: option.quantity });
+      this.closeSizeDropdown();
+    },
+    onDocumentClick(event) {
+      if (!this.$el.contains(event.target)) {
+        this.closeSizeDropdown();
+      }
+    },
+  }
 };

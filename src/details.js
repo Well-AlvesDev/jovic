@@ -53,6 +53,7 @@ createApp({
     const menuOpen = ref(false);
     const cartCount = ref(0);
     const quantity = ref(1);
+    const maxQuantity = ref(null);
 
     // ── Computed: imagens do produto ──────────────────────────
     const images = computed(() => parseImages(product.value?.['IMAGE-URL']));
@@ -94,7 +95,7 @@ createApp({
 
         const { data, error: sbError } = await supabase
           .from(TABLE)
-          .select('ID, PRODUTO, PREÇO, "IMAGE-URL", DESCRIPTION, DESCONTO, PARCELAMENTO')
+          .select('ID, PRODUTO, PREÇO, "IMAGE-URL", DESCRIPTION, DESCONTO, PARCELAMENTO, product_model')
           .eq('ID', id)
           .single();
 
@@ -110,8 +111,13 @@ createApp({
     }
 
     // ── Ações do carrinho ─────────────────────────────────────
-    function increaseQty() { quantity.value++; }
-    function decreaseQty() { if (quantity.value > 1) quantity.value--; }
+    function increaseQty() {
+      if (maxQuantity.value !== null && quantity.value >= maxQuantity.value) return;
+      quantity.value++;
+    }
+    function decreaseQty() {
+      if (quantity.value > 1) quantity.value--;
+    }
 
     function addToCart() {
       // Temporariamente desativado: não adiciona itens à sacola.
@@ -121,6 +127,20 @@ createApp({
     function buyNow() {
       // Temporariamente desativado: sem ação de compra por enquanto.
       console.log('Comprar agora desativado para este momento.');
+    }
+
+    function onSizeSelected(sizeInfo) {
+      if (!sizeInfo || typeof sizeInfo.quantity !== 'number') {
+        maxQuantity.value = null;
+        return;
+      }
+
+      maxQuantity.value = sizeInfo.quantity;
+      if (maxQuantity.value === 0) {
+        quantity.value = 1;
+      } else if (quantity.value > maxQuantity.value) {
+        quantity.value = maxQuantity.value;
+      }
     }
 
     // ── Menu / sidebar ────────────────────────────────────────
@@ -214,6 +234,7 @@ createApp({
               :quantity="quantity"
               @increase-qty="increaseQty"
               @decrease-qty="decreaseQty"
+              @size-selected="onSizeSelected"
               @add-to-cart="addToCart"
               @buy-now="buyNow"
             />
