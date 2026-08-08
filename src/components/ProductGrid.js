@@ -25,14 +25,10 @@ export default {
             }
 
             return this.products
-                .map(product => {
-                    const productText = `${product?.PRODUTO || ''} ${product?.DESCRIPTION || ''}`;
-                    const score = this.getSearchScore(searchText, productText, product?.PRODUTO || '', product?.DESCRIPTION || '');
-                    return { product, score };
-                })
-                .filter(({ score }) => score > 0)
-                .sort((a, b) => b.score - a.score)
-                .map(({ product }) => product);
+                .filter(product => {
+                    const productText = product?.PRODUTO || '';
+                    return this.getSearchScore(searchText, productText, product?.PRODUTO || '');
+                });
         },
         searchHeading() {
             if (!this.searchQuery) {
@@ -111,27 +107,14 @@ export default {
 
             return matrix[a.length][b.length];
         },
-        getSearchScore(searchText, productText, productName = '', productDescription = '') {
+        getSearchScore(searchText, productText, productName = '') {
             const normalizedQuery = this.normalizeText(searchText);
-            if (!normalizedQuery) return 0;
+            if (!normalizedQuery) return false;
 
             const normalizedProductText = this.normalizeText(productText);
             const normalizedProductName = this.normalizeText(productName);
-            const normalizedProductDescription = this.normalizeText(productDescription);
 
-            if (!normalizedProductText) return 0;
-
-            if (normalizedProductText.includes(normalizedQuery)) {
-                return 1000;
-            }
-
-            if (normalizedProductName.includes(normalizedQuery)) {
-                return 900;
-            }
-
-            if (normalizedProductDescription.includes(normalizedQuery)) {
-                return 700;
-            }
+            if (!normalizedProductText) return false;
 
             const queryTokens = normalizedQuery
                 .split(' ')
@@ -139,51 +122,21 @@ export default {
                 .filter(token => token.length > 1 && !this.isStopword(token));
 
             if (queryTokens.length === 0) {
-                return 0;
+                return false;
             }
 
-            let score = 0;
             const productTokens = normalizedProductName.split(' ').filter(Boolean);
-            const textTokens = normalizedProductText.split(' ').filter(Boolean);
 
-            queryTokens.forEach(queryToken => {
-                const variants = this.getTokenVariants(queryToken);
-                const hasNameMatch = productTokens.some(productToken => {
+            return queryTokens.every(queryToken => {
+                const queryVariants = this.getTokenVariants(queryToken);
+
+                return productTokens.some(productToken => {
                     const productVariants = this.getTokenVariants(productToken);
-                    return variants.some(variant => productVariants.some(candidate => candidate === variant || candidate.includes(variant) || variant.includes(candidate)));
+                    return queryVariants.some(variant =>
+                        productVariants.some(candidate => candidate === variant)
+                    );
                 });
-
-                const hasTextMatch = textTokens.some(productToken => {
-                    const productVariants = this.getTokenVariants(productToken);
-                    return variants.some(variant => productVariants.some(candidate => candidate === variant || candidate.includes(variant) || variant.includes(candidate)));
-                });
-
-                if (hasNameMatch) score += 260;
-                if (hasTextMatch) score += 120;
-
-                const bestDistance = Math.min(...textTokens.map(token => this.levenshteinDistance(queryToken, token)));
-                if (bestDistance <= 2) {
-                    score += Math.max(180 - bestDistance * 35, 0);
-                } else if (bestDistance <= 4) {
-                    score += 30;
-                }
             });
-
-            const fullNameDistance = this.levenshteinDistance(normalizedQuery, normalizedProductName);
-            if (fullNameDistance <= 3) {
-                score += Math.max(220 - fullNameDistance * 45, 0);
-            } else if (fullNameDistance <= 6) {
-                score += 40;
-            }
-
-            const fullTextDistance = this.levenshteinDistance(normalizedQuery, normalizedProductText);
-            if (fullTextDistance <= 3) {
-                score += Math.max(140 - fullTextDistance * 25, 0);
-            } else if (fullTextDistance <= 6) {
-                score += 25;
-            }
-
-            return score;
         },
         shuffleProducts(products) {
             const shuffled = [...products];
