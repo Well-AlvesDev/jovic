@@ -25,8 +25,18 @@ export default {
       const headerHeight = 70;
       const searchEl = this.$refs.searchWrap;
       if (!searchEl) return;
-      const top = searchEl.getBoundingClientRect().top + window.pageYOffset - headerHeight - 8;
-      window.scrollTo({ top, behavior: 'smooth' });
+
+      const forcedScrollTop = 480;
+      const currentScrollTop = window.pageYOffset;
+
+      const scrollToPosition = () => {
+        const top = searchEl.getBoundingClientRect().top + currentScrollTop - headerHeight - 8;
+        const finalTop = forcedScrollTop;
+        window.scrollTo({ top: finalTop, behavior: 'smooth' });
+      };
+
+      scrollToPosition();
+      window.setTimeout(scrollToPosition, 160);
     },
     submitSearch() {
       this.$emit('update:modelValue', this.localSearch);
