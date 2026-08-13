@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { parseProductModel, validateRequestedStock, calculateDiscountedPrice } from '../src/checkout/pixValidation.js';
+
+const model = 'G*1, PP*3, P*1';
+
+assert.deepEqual(parseProductModel(model), [
+    { size: 'G', quantity: 1 },
+    { size: 'PP', quantity: 3 },
+    { size: 'P', quantity: 1 },
+]);
+
+assert.equal(validateRequestedStock(model, 'PP', 2), true);
+assert.equal(validateRequestedStock(model, 'P', 2), false);
+assert.equal(validateRequestedStock(model, 'M', 1), false);
+assert.equal(calculateDiscountedPrice(100, 20), 80);
+
+console.log('pixValidation tests passed');

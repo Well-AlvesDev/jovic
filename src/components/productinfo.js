@@ -5,7 +5,7 @@ export default {
     product: { type: Object, default: null },
     quantity: { type: Number, default: 1 },
   },
-  emits: ['increase-qty', 'decrease-qty', 'add-to-cart', 'buy-now'],
+  emits: ['increase-qty', 'decrease-qty', 'add-to-cart', 'buy-now', 'size-selected'],
   computed: {
     discountPercentage() {
       const rawDiscount = this.product?.DESCONTO ?? 0;
@@ -200,7 +200,7 @@ export default {
 
         <!-- Ações -->
         <div class="detail-actions">
-          <button class="detail-btn detail-btn--primary" @click="$emit('buy-now')">
+          <button class="detail-btn detail-btn--primary" @click="$emit('buy-now', selectedSize)">
             <i class="ri-zap-line"></i>
             Comprar agora
           </button>

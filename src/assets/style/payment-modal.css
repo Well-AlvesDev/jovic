@@ -163,6 +163,65 @@
     border-radius: 8px
 }
 
+.pm-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 240px;
+    text-align: center;
+    color: #444;
+}
+
+.pm-loader-spinner {
+    width: 42px;
+    height: 42px;
+    border: 3px solid rgba(15, 23, 42, 0.12);
+    border-top-color: #111;
+    border-radius: 50%;
+    animation: pm-spin 0.8s linear infinite;
+}
+
+@keyframes pm-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.pm-pix-result {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pm-qr-box {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 220px;
+    padding: 12px;
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+    border-radius: 12px;
+}
+
+.pm-qr-image {
+    width: 220px;
+    height: 220px;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 10px;
+}
+
+.pm-payment-meta {
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 /* Desktop tweaks */
 @media(min-width:720px) {
     .payment-modal-overlay {

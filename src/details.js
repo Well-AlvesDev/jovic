@@ -55,6 +55,7 @@ createApp({
     const cartCount = ref(0);
     const quantity = ref(1);
     const maxQuantity = ref(null);
+    const selectedSize = ref('');
     const showPaymentModal = ref(false);
 
     // ── Computed: imagens do produto ──────────────────────────
@@ -126,8 +127,25 @@ createApp({
       console.log('Adicionar à sacola desativado para este momento.');
     }
 
-    function buyNow() {
-      // Abre o modal de pagamento
+    function buyNow(sizeOverride = null) {
+      if (!product.value) {
+        alert('Produto não encontrado.');
+        return;
+      }
+
+      const activeSize =
+        (typeof sizeOverride === 'string' && sizeOverride.trim())
+          ? sizeOverride
+          : (sizeOverride && typeof sizeOverride === 'object' && sizeOverride.selectedSize)
+            ? sizeOverride.selectedSize
+            : selectedSize.value;
+
+      if (!activeSize) {
+        alert('Selecione um tamanho antes de continuar com o pagamento.');
+        return;
+      }
+
+      selectedSize.value = activeSize;
       showPaymentModal.value = true;
     }
 
@@ -136,19 +154,17 @@ createApp({
     }
 
     function onPaymentConfirm(paymentData) {
-      console.log('Pagamento confirmado (mock):', paymentData);
-      // Aqui você pode integrar com sua API / gateway de pagamento
-      showPaymentModal.value = false;
-      // feedback simples ao usuário
-      alert('Pagamento processado (simulação). Obrigado!');
+      console.log('Checkout PIX processado:', paymentData);
     }
 
     function onSizeSelected(sizeInfo) {
       if (!sizeInfo || typeof sizeInfo.quantity !== 'number') {
         maxQuantity.value = null;
+        selectedSize.value = '';
         return;
       }
 
+      selectedSize.value = sizeInfo.label || '';
       maxQuantity.value = sizeInfo.quantity;
       if (maxQuantity.value === 0) {
         quantity.value = 1;
@@ -175,6 +191,7 @@ createApp({
       images,
       breadcrumbItems,
       quantity,
+      selectedSize,
       menuOpen,
       cartCount,
       store: STORE_CONFIG,
@@ -264,6 +281,7 @@ createApp({
         :show="showPaymentModal"
         :product="product"
         :quantity="quantity"
+        :selectedSize="selectedSize"
         @close="closeModal"
         @confirm="onPaymentConfirm"
       />
