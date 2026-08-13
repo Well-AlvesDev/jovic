@@ -10,6 +10,7 @@ import Sidebar from './components/Sidebar.js';
 import Breadcrumb from './components/breadcrumb.js';
 import ProductGallery from './components/productgallery.js';
 import ProductInfo from './components/productinfo.js';
+import PaymentModal from './components/PaymentModal.js';
 import { sidebarStoreInfo } from './sidebarInfo.js';
 import { CATEGORIES } from './categories.js';
 
@@ -43,7 +44,7 @@ function parseImages(imageUrl) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 createApp({
-  components: { AppHeader, Sidebar, Breadcrumb, ProductGallery, ProductInfo },
+  components: { AppHeader, Sidebar, Breadcrumb, ProductGallery, ProductInfo, PaymentModal },
 
   setup() {
     // ── Estado global da página ───────────────────────────────
@@ -54,6 +55,7 @@ createApp({
     const cartCount = ref(0);
     const quantity = ref(1);
     const maxQuantity = ref(null);
+    const showPaymentModal = ref(false);
 
     // ── Computed: imagens do produto ──────────────────────────
     const images = computed(() => parseImages(product.value?.['IMAGE-URL']));
@@ -125,8 +127,20 @@ createApp({
     }
 
     function buyNow() {
-      // Temporariamente desativado: sem ação de compra por enquanto.
-      console.log('Comprar agora desativado para este momento.');
+      // Abre o modal de pagamento
+      showPaymentModal.value = true;
+    }
+
+    function closeModal() {
+      showPaymentModal.value = false;
+    }
+
+    function onPaymentConfirm(paymentData) {
+      console.log('Pagamento confirmado (mock):', paymentData);
+      // Aqui você pode integrar com sua API / gateway de pagamento
+      showPaymentModal.value = false;
+      // feedback simples ao usuário
+      alert('Pagamento processado (simulação). Obrigado!');
     }
 
     function onSizeSelected(sizeInfo) {
@@ -169,6 +183,9 @@ createApp({
       decreaseQty,
       addToCart,
       buyNow,
+      showPaymentModal,
+      closeModal,
+      onPaymentConfirm,
       toggleMenu,
       closeSidebar,
       onCategorySidebarSelect,
@@ -243,6 +260,13 @@ createApp({
         </div>
 
       </main>
+      <PaymentModal
+        :show="showPaymentModal"
+        :product="product"
+        :quantity="quantity"
+        @close="closeModal"
+        @confirm="onPaymentConfirm"
+      />
     </div>
   `,
 }).mount('#app');

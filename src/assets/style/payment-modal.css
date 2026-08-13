@@ -1,0 +1,175 @@
+/* Mobile-first payment modal styles */
+.payment-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 1200;
+    padding: 12px;
+}
+
+.payment-modal {
+    width: 100%;
+    max-width: 760px;
+    background: #fff;
+    border-radius: 12px 12px 6px 6px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 92vh;
+}
+
+.payment-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.payment-modal-header h3 {
+    margin: 0;
+    font-size: 16px
+}
+
+.pm-close {
+    background: none;
+    border: 0;
+    font-size: 20px
+}
+
+
+.payment-modal-body {
+    padding: 0 16px;
+    flex: 1;
+    overflow: auto;
+}
+
+.pm-fixed-area {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 3;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f3f3;
+}
+
+.pm-product {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.pm-product-name {
+    display: block
+}
+
+.pm-product-qty {
+    font-size: 13px;
+    color: #666
+}
+
+.pm-product-total {
+    font-weight: 700
+}
+
+.pm-methods {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.pm-method {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #e6e6e6;
+    background: #fafafa;
+    border-radius: 8px;
+    font-weight: 600
+}
+
+.pm-method.active {
+    background: #111;
+    color: #fff;
+    border-color: #111
+}
+
+.pm-scrollable {
+    padding: 12px 0;
+}
+
+.pm-method-panel {
+    padding-top: 8px;
+}
+
+.pm-note {
+    font-size: 13px;
+    color: #666;
+    margin-top: 8px;
+}
+
+.pm-pix-form .pm-field {
+    display: block;
+    margin-bottom: 10px;
+}
+
+.pm-field span {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #444;
+}
+
+.pm-field input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e6e6e6;
+    border-radius: 8px;
+}
+
+.pm-row {
+    display: flex;
+    gap: 8px;
+}
+
+.pm-field.small {
+    flex: 1;
+}
+
+.payment-modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 12px 16px;
+    border-top: 1px solid #f3f3f3
+}
+
+.pm-cancel {
+    background: #fff;
+    border: 1px solid #e6e6e6;
+    padding: 10px 14px;
+    border-radius: 8px
+}
+
+.pm-confirm {
+    background: #111;
+    color: #fff;
+    border: 0;
+    padding: 10px 14px;
+    border-radius: 8px
+}
+
+/* Desktop tweaks */
+@media(min-width:720px) {
+    .payment-modal-overlay {
+        align-items: center;
+    }
+
+    .payment-modal {
+        border-radius: 8px;
+    }
+}
