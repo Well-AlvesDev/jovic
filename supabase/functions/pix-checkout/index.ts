@@ -1,3 +1,10 @@
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+  serve(handler: (req: Request) => Promise<Response> | Response): void;
+};
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -26,7 +33,7 @@ function parseProductModel(rawModel = '') {
 
 function validateRequestedStock(rawModel = '', requestedSize = '', requestedQuantity = 1) {
   const normalizedSize = String(requestedSize ?? '').trim().toUpperCase();
-  const quantityToCheck = Number.parseInt(requestedQuantity, 10);
+  const quantityToCheck = Number(requestedQuantity);
 
   if (!normalizedSize || Number.isNaN(quantityToCheck) || quantityToCheck <= 0) {
     return false;
@@ -55,19 +62,32 @@ function normalizeCpf(value = '') {
   return String(value ?? '').replace(/\D/g, '');
 }
 
-function buildCorsHeaders() {
+function buildCorsHeaders(request: Request) {
+  const origin = request.headers.get('Origin') ?? '';
+  const allowedOrigins = new Set([
+    'https://usejovic.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:8080',
+    'http://127.0.0.1:5500',
+  ]);
+
+  const allowOrigin = allowedOrigins.has(origin) ? origin : '*';
+
   return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
   };
 }
 
 Deno.serve(async (req) => {
+  // AJUSTE AQUI: Responda com 'ok' e status 200
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: buildCorsHeaders(),
+    return new Response('ok', {
+      status: 200,
+      headers: buildCorsHeaders(req),
     });
   }
 
@@ -76,10 +96,12 @@ Deno.serve(async (req) => {
       JSON.stringify({ ok: false, error: 'Método não permitido.' }),
       {
         status: 405,
-        headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+        headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
       },
     );
   }
+
+  // ... (o resto do seu bloco try/catch continua exatamente igual)
 
   try {
     const payload = await req.json();
@@ -93,7 +115,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: 'Variáveis do Supabase não configuradas.' }),
         {
           status: 500,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
         },
       );
     }
@@ -103,7 +125,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: 'O ID do produto é obrigatório.' }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
         },
       );
     }
@@ -113,7 +135,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: 'Selecione o tamanho do produto.' }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
         },
       );
     }
@@ -123,7 +145,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: 'Preencha todos os campos obrigatórios do cliente.' }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
         },
       );
     }
@@ -143,7 +165,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: 'Produto não encontrado.', details: productError?.message ?? null }),
         {
           status: 404,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
         },
       );
     }
@@ -155,7 +177,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: 'Tamanho ou quantidade indisponíveis para esse produto.' }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
         },
       );
     }
@@ -169,7 +191,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: 'Token do Mercado Pago não configurado.' }),
         {
           status: 500,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
         },
       );
     }
@@ -215,12 +237,15 @@ Deno.serve(async (req) => {
 
     if (!mpResponse.ok) {
       const errorText = await mpResponse.text();
+      console.log('MP ERROR:', errorText);
+
       return new Response(
-        JSON.stringify({ ok: false, error: 'Erro ao gerar pagamento PIX no Mercado Pago.', details: errorText }),
-        {
-          status: 502,
-          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
-        },
+        JSON.stringify({
+          ok: false,
+          error: 'Erro ao gerar pagamento PIX no Mercado Pago.',
+          details: errorText
+        }),
+        { status: 502, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) } }
       );
     }
 
@@ -249,7 +274,7 @@ Deno.serve(async (req) => {
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+        headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
       },
     );
   } catch (error) {
@@ -257,7 +282,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ ok: false, error: 'Erro interno do checkout PIX.', details: error instanceof Error ? error.message : String(error) }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...buildCorsHeaders() },
+        headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
       },
     );
   }
