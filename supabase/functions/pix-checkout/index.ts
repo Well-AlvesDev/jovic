@@ -48,9 +48,44 @@ function validateRequestedStock(rawModel = '', requestedSize = '', requestedQuan
   return stockEntry.quantity >= quantityToCheck;
 }
 
+function parseCurrencyNumber(value: string | number) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  const sanitized = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^\d,.-]/g, '');
+
+  if (!sanitized || sanitized === '-' || sanitized === '.' || sanitized === ',') {
+    return Number.NaN;
+  }
+
+  const hasComma = sanitized.includes(',');
+  const hasDot = sanitized.includes('.');
+
+  if (hasComma && hasDot) {
+    const decimalSeparator = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.') ? ',' : '.';
+    const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+    const normalized = sanitized
+      .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
+      .replace(decimalSeparator, '.');
+    return Number.parseFloat(normalized);
+  }
+
+  if (hasComma) {
+    return Number.parseFloat(sanitized.replace(',', '.'));
+  }
+
+  if (hasDot && sanitized.split('.').length > 2) {
+    return Number.parseFloat(sanitized.replace(/\./g, ''));
+  }
+
+  return Number.parseFloat(sanitized);
+}
+
 function calculateDiscountedPrice(priceValue: string | number, discountPercent = 0) {
-  const numericPrice = Number.parseFloat(String(priceValue ?? '').replace(',', '.'));
-  const numericDiscount = Number.parseFloat(String(discountPercent ?? '0'));
+  const numericPrice = parseCurrencyNumber(priceValue);
+  const numericDiscount = Number.parseFloat(String(discountPercent ?? '0').replace(',', '.'));
 
   if (Number.isNaN(numericPrice)) return 0;
 
@@ -201,11 +236,17 @@ Deno.serve(async (req) => {
     const firstName = fullName.split(' ')[0] || 'Cliente';
     const lastName = fullName.split(' ').slice(1).join(' ') || 'Comprador';
 
+    // Idempotency key única por tentativa de pagamento. O Mercado Pago exige
+    // esse header em toda criação de pagamento (POST /v1/payments); sem ele
+    // a API responde 400 "Header X-Idempotency-Key can't be null".
+    const idempotencyKey = crypto.randomUUID();
+
     const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
+        'X-Idempotency-Key': idempotencyKey,
       },
       body: JSON.stringify({
         transaction_amount: Number(finalPrice.toFixed(2)),

@@ -13,5 +13,7 @@ assert.equal(validateRequestedStock(model, 'PP', 2), true);
 assert.equal(validateRequestedStock(model, 'P', 2), false);
 assert.equal(validateRequestedStock(model, 'M', 1), false);
 assert.equal(calculateDiscountedPrice(100, 20), 80);
+assert.equal(calculateDiscountedPrice('R$ 120,00', 10), 108);
+assert.equal(calculateDiscountedPrice('1.299,90', 5), 1234.9);
 
 console.log('pixValidation tests passed');

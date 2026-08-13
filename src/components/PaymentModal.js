@@ -1,3 +1,5 @@
+import { SUPABASE_CONFIG } from '../config.js';
+
 export default {
   name: 'PaymentModal',
   props: {
@@ -43,7 +45,7 @@ export default {
       return this.selectedSize || 'Não informado';
     },
     totalAmount() {
-      const price = parseFloat(this.product?.PREÇO) || 0;
+      const price = Number.parseFloat(String(this.product?.PREÇO ?? '').replace(/[\.]/g, '').replace(',', '.')) || 0;
       const discount = Number(this.product?.DESCONTO || 0);
       const finalPrice = price * (1 - discount / 100);
       return (finalPrice * (this.quantity || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -135,20 +137,28 @@ export default {
         this.pendingCheckoutData = JSON.parse(JSON.stringify(payload));
 
         try {
-          const response = await fetch('https://hovfcntzthahwszjaxsw.supabase.co/functions/v1/pix-checkout', {
+          const response = await fetch(SUPABASE_CONFIG.pixCheckoutUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvdmZjbnR6dGhhaHdzempheHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMDgxNDUsImV4cCI6MjA5Mzc4NDE0NX0.Pss5O_ykTybPUsuZCCln72Pq5dkTGMQ1G1kXR4HOVyw',
-              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvdmZjbnR6dGhhaHdzempheHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMDgxNDUsImV4cCI6MjA5Mzc4NDE0NX0.Pss5O_ykTybPUsuZCCln72Pq5dkTGMQ1G1kXR4HOVyw',
+              'apikey': SUPABASE_CONFIG.anonKey,
             },
             body: JSON.stringify(payload),
           });
 
-          const data = await response.json();
+          let data = null;
+          const responseText = await response.text();
 
-          if (!response.ok || !data?.ok) {
-            throw new Error(data?.error || 'Não foi possível gerar o QR Code do Pix.');
+          if (responseText) {
+            try {
+              data = JSON.parse(responseText);
+            } catch (error) {
+              data = { error: responseText };
+            }
+          }
+
+          if (!response.ok || data?.ok === false) {
+            throw new Error(data?.error || `Não foi possível gerar o QR Code do Pix. Status ${response.status}.`);
           }
 
           this.paymentResult = data;
