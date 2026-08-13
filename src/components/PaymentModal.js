@@ -204,7 +204,7 @@ export default {
               <div class="pm-product-total">{{ totalAmount }}</div>
             </div>
 
-            <div class="pm-methods">
+            <div class="pm-methods" v-if="!(method === 'pix' && (isSubmitting || paymentResult))">
               <button :class="['pm-method', method==='pix' ? 'active' : '']" @click.prevent="selectMethod('pix')">PIX</button>
               <button :class="['pm-method', method==='credit' ? 'active' : '']" @click.prevent="selectMethod('credit')">Cartão de Crédito</button>
               <button :class="['pm-method', method==='debit' ? 'active' : '']" @click.prevent="selectMethod('debit')">Débito</button>
