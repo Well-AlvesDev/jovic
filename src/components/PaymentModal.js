@@ -226,15 +226,6 @@ export default {
                       <div class="pm-qr-box">
                         <img v-if="pixQrCode" :src="pixQrCode" alt="QR Code PIX" class="pm-qr-image" />
                       </div>
-                      <div class="pm-payment-meta">
-                        <strong>Valor:</strong> {{ totalAmount }}
-                      </div>
-                      <div class="pm-payment-meta">
-                        <strong>Produto:</strong> {{ productLabel }}
-                      </div>
-                      <div class="pm-payment-meta">
-                        <strong>Tamanho:</strong> {{ selectedSizeLabel }}
-                      </div>
                       <button class="pm-confirm" @click.prevent="copyPix">Copiar link do Pix</button>
                     </div>
                   </template>
