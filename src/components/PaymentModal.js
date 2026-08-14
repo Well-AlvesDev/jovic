@@ -16,6 +16,8 @@ export default {
       loadingMessage: 'Validando dados do pedido...',
       pixQrCode: '',
       pixTicketUrl: '',
+      pixCode: '',
+      copySuccess: false,
       paymentResult: null,
       pendingCheckoutData: null,
       pixForm: {
@@ -64,6 +66,8 @@ export default {
         this.card = { number: '', name: '', expiry: '', cvv: '' };
         this.pixQrCode = '';
         this.pixTicketUrl = '';
+        this.pixCode = '';
+        this.copySuccess = false;
         this.paymentResult = null;
         this.pendingCheckoutData = null;
         this.isSubmitting = false;
@@ -81,9 +85,13 @@ export default {
       this.method = m;
     },
     copyPix() {
-      if (!this.pixQrCode && !this.pixTicketUrl) return;
-      navigator.clipboard?.writeText(this.pixTicketUrl || this.pixQrCode).then(() => {
-        alert('Link/QR Code copiado.');
+      const textToCopy = this.pixCode || this.pixTicketUrl || this.pixQrCode;
+      if (!textToCopy) return;
+      navigator.clipboard?.writeText(textToCopy).then(() => {
+        this.copySuccess = true;
+        setTimeout(() => {
+          this.copySuccess = false;
+        }, 900);
       }).catch(() => { });
     },
     sanitizeCpf(value) {
@@ -164,6 +172,7 @@ export default {
           this.paymentResult = data;
           this.pixQrCode = data.qrCodeBase64 ? `data:image/png;base64,${data.qrCodeBase64}` : (data.qrCode || '');
           this.pixTicketUrl = data.ticketUrl || '';
+          this.pixCode = data.qrCode || '';
           this.isSubmitting = false;
           this.loadingMessage = 'Pagamento PIX pronto';
           this.$emit('confirm', { method: 'pix', customer: { ...this.pixForm }, product: this.product, quantity: this.quantity, size: this.selectedSize, payment: data, formSnapshot: this.pendingCheckoutData });
@@ -226,7 +235,18 @@ export default {
                       <div class="pm-qr-box">
                         <img v-if="pixQrCode" :src="pixQrCode" alt="QR Code PIX" class="pm-qr-image" />
                       </div>
-                      <button class="pm-confirm" @click.prevent="copyPix">Copiar link do Pix</button>
+
+                      <div class="pm-pix-copy-row" v-if="pixCode" @click.prevent="copyPix">
+                        <div v-if="!copySuccess" class="pm-pix-code" title="Clique para copiar o código PIX">{{ pixCode }}</div>
+                        <button v-if="!copySuccess" class="pm-copy-button" @click.prevent="copyPix" aria-label="Copiar código PIX">
+                          <i class="ri-file-copy-line"></i>
+                          <span>copiar</span>
+                        </button>
+
+                        <div v-if="copySuccess" class="pm-copy-success-message" aria-live="polite">
+                          Código pix copiado!
+                        </div>
+                      </div>
                     </div>
                   </template>
 
