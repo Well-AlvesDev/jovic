@@ -57,6 +57,7 @@ createApp({
     const maxQuantity = ref(null);
     const selectedSize = ref('');
     const showPaymentModal = ref(false);
+    const debugMode = ref(false);
 
     // ── Computed: imagens do produto ──────────────────────────
     const images = computed(() => parseImages(product.value?.['IMAGE-URL']));
@@ -151,10 +152,21 @@ createApp({
 
     function closeModal() {
       showPaymentModal.value = false;
+      debugMode.value = false;
     }
 
     function onPaymentConfirm(paymentData) {
       console.log('Checkout PIX processado:', paymentData);
+    }
+
+    function onDebugPayment() {
+      // Simula um pagamento PIX concluído para testes
+      if (!product.value) {
+        alert('Carregue um produto primeiro.');
+        return;
+      }
+      debugMode.value = true;
+      showPaymentModal.value = true;
     }
 
     function onSizeSelected(sizeInfo) {
@@ -206,6 +218,8 @@ createApp({
       toggleMenu,
       closeSidebar,
       onCategorySidebarSelect,
+      onDebugPayment,
+      debugMode,
     };
   },
 
@@ -219,6 +233,7 @@ createApp({
         :storeName="store.name"
         :logoSticky="true"
         @toggle-menu="toggleMenu"
+        @debug-payment="onDebugPayment"
       />
 
       <!-- Sidebar (reutilizado) -->
@@ -282,6 +297,7 @@ createApp({
         :product="product"
         :quantity="quantity"
         :selectedSize="selectedSize"
+        :debugMode="debugMode"
         @close="closeModal"
         @confirm="onPaymentConfirm"
       />

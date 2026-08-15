@@ -60,11 +60,19 @@ function parseCurrencyNumber(value) {
     }
 
     if (hasComma) {
+        const [integerPart = '', fractionalPart = ''] = sanitized.split(',');
+        if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+            return Number.parseFloat(integerPart + fractionalPart);
+        }
         return Number.parseFloat(sanitized.replace(',', '.'));
     }
 
-    if (hasDot && sanitized.split('.').length > 2) {
-        return Number.parseFloat(sanitized.replace(/\./g, ''));
+    if (hasDot) {
+        const [integerPart = '', fractionalPart = ''] = sanitized.split('.');
+        if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+            return Number.parseFloat(integerPart + fractionalPart);
+        }
+        return Number.parseFloat(sanitized);
     }
 
     return Number.parseFloat(sanitized);

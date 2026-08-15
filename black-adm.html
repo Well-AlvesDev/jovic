@@ -12,6 +12,13 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css">
     <script>
+        const SUPABASE_CONFIG = {
+            url: 'https://hovfcntzthahwszjaxsw.supabase.co',
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvdmZjbnR6dGhhaHdzempheHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMDgxNDUsImV4cCI6MjA5Mzc4NDE0NX0.Pss5O_ykTybPUsuZCCln72Pq5dkTGMQ1G1kXR4HOVyw',
+            table: 'j-box',
+            pixCheckoutUrl: 'https://hovfcntzthahwszjaxsw.supabase.co/functions/v1/pix-checkout'
+        };
+
         // Registrar Service Worker para cache de imagens (5 horas)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./src/service-worker.js', { scope: '/' })
@@ -19,7 +26,6 @@
                 .catch((err) => console.log('Service Worker registration failed:', err));
         }
     </script>
-    <script src="./src/config.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
 
@@ -2530,6 +2536,28 @@
                         <textarea id="productDescription" placeholder="Descreva o produto..."></textarea>
                     </div>
 
+                    <p class="form-section-title">Dimensões</p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productWidth">Largura (cm)</label>
+                            <input type="number" id="productWidth" min="0" step="0.01" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="productLength">Comprimento (cm)</label>
+                            <input type="number" id="productLength" min="0" step="0.01" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productHeight">Altura (cm)</label>
+                            <input type="number" id="productHeight" min="0" step="0.01" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="productWeight">Peso</label>
+                            <input type="number" id="productWeight" min="0" step="0.01" placeholder="0">
+                        </div>
+                    </div>
+
                     <p class="form-section-title">Modelos</p>
                     <div class="form-group">
                         <label for="modelInput">Adicionar modelo</label>
@@ -2762,6 +2790,28 @@
                     <div class="form-group">
                         <label for="editProductDescription">Descrição</label>
                         <textarea id="editProductDescription" placeholder="Descreva o produto..."></textarea>
+                    </div>
+
+                    <p class="form-section-title">Dimensões</p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editProductWidth">Largura (cm)</label>
+                            <input type="number" id="editProductWidth" min="0" step="0.01" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="editProductLength">Comprimento (cm)</label>
+                            <input type="number" id="editProductLength" min="0" step="0.01" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editProductHeight">Altura (cm)</label>
+                            <input type="number" id="editProductHeight" min="0" step="0.01" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="editProductWeight">Peso</label>
+                            <input type="number" id="editProductWeight" min="0" step="0.01" placeholder="0">
+                        </div>
                     </div>
 
                     <p class="form-section-title">Modelos</p>
@@ -3444,6 +3494,68 @@
             inputElement.value = numValue.toString();
         }
 
+        function normalizeDimensionValue(rawValue) {
+            const value = String(rawValue ?? '').trim().replace(',', '.');
+            if (!value) return '';
+            const numericValue = Number(value);
+            if (Number.isNaN(numericValue)) return '';
+            return numericValue.toString();
+        }
+
+        function buildDimeValue(data) {
+            const width = normalizeDimensionValue(data.width);
+            const length = normalizeDimensionValue(data.length);
+            const height = normalizeDimensionValue(data.height);
+            const weight = normalizeDimensionValue(data.weight);
+
+            const pieces = [];
+            if (width) pieces.push(`L${width}`);
+            if (length) pieces.push(`C${length}`);
+            if (height) pieces.push(`A${height}`);
+            if (weight) pieces.push(`P${weight}`);
+
+            return pieces.join(', ');
+        }
+
+        function parseDimeValue(value) {
+            const result = { width: '', length: '', height: '', weight: '' };
+            if (!value) return result;
+
+            const tokens = String(value)
+                .split(',')
+                .map(token => token.trim())
+                .filter(Boolean);
+
+            tokens.forEach(token => {
+                const match = token.match(/^([L|C|A|P])\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)$/i);
+                if (!match) return;
+
+                const key = match[1].toUpperCase();
+                const numberValue = normalizeDimensionValue(match[2]);
+
+                if (!numberValue) return;
+
+                switch (key) {
+                    case 'L':
+                        result.width = numberValue;
+                        break;
+                    case 'C':
+                        result.length = numberValue;
+                        break;
+                    case 'A':
+                        result.height = numberValue;
+                        break;
+                    case 'P':
+                        result.weight = numberValue;
+                        break;
+                    default:
+                        break;
+                }
+            });
+
+            return result;
+        }
+
         // Event listeners para desconto e parcelas na publicação
         const productDiscountInput = document.getElementById('productDiscount');
         const installmentsInput = document.getElementById('installments');
@@ -3585,6 +3697,12 @@
             const discount = parseFloat(document.getElementById('productDiscount').value);
             const installments = parseInt(document.getElementById('installments').value);
             const interestFreeInstallments = parseInt(document.getElementById('interestFreeInstallments').value);
+            const dime = buildDimeValue({
+                width: document.getElementById('productWidth').value,
+                length: document.getElementById('productLength').value,
+                height: document.getElementById('productHeight').value,
+                weight: document.getElementById('productWeight').value
+            });
             const imagesFiles = selectedImages.map(i => i.file);
 
             let isValid = true;
@@ -3677,6 +3795,7 @@
                         PARCELAMENTO: `${installments},${interestFreeInstallments}`,
                         DESCRIPTION: document.getElementById('productDescription').value,
                         product_model: modelsString,
+                        dime: dime,
                         DISPONIBILIDADE: true
                     };
 
@@ -3967,6 +4086,12 @@
 
             document.getElementById('editProductDescription').value = prod.DESCRIPTION || prod.description || '';
 
+            const parsedDime = parseDimeValue(prod.dime || prod.DIME || '');
+            document.getElementById('editProductWidth').value = parsedDime.width;
+            document.getElementById('editProductLength').value = parsedDime.length;
+            document.getElementById('editProductHeight').value = parsedDime.height;
+            document.getElementById('editProductWeight').value = parsedDime.weight;
+
             // Formatar desconto
             const editDiscountInput = document.getElementById('editProductDiscount');
             editDiscountInput.value = prod.DESCONTO || prod.desconto || '0';
@@ -4199,6 +4324,12 @@
             const discount = document.getElementById('editProductDiscount').value || '0';
             const installments = document.getElementById('editInstallments').value || '0';
             const interestFreeInstallments = document.getElementById('editInterestFreeInstallments').value || '0';
+            const dime = buildDimeValue({
+                width: document.getElementById('editProductWidth').value,
+                length: document.getElementById('editProductLength').value,
+                height: document.getElementById('editProductHeight').value,
+                weight: document.getElementById('editProductWeight').value
+            });
             const availability = document.getElementById('editProductAvailability').checked;
 
             // Validar campos obrigatórios
@@ -4271,7 +4402,8 @@
                     DESCONTO: String(discount),
                     PARCELAMENTO: `${installments},${interestFreeInstallments}`,
                     DISPONIBILIDADE: availability,
-                    product_model: modelsString
+                    product_model: modelsString,
+                    dime: dime
                 };
 
                 // Atualizar imagens se houver novas

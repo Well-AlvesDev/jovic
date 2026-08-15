@@ -7,9 +7,51 @@ export default {
   },
   emits: ['increase-qty', 'decrease-qty', 'add-to-cart', 'buy-now', 'size-selected'],
   computed: {
+    parseCurrencyNumber() {
+      return (value) => {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+        const sanitized = String(value ?? '')
+          .trim()
+          .replace(/\s+/g, '')
+          .replace(/[^\d,.-]/g, '');
+
+        if (!sanitized || sanitized === '-' || sanitized === '.' || sanitized === ',') {
+          return Number.NaN;
+        }
+
+        if (sanitized.includes(',') && sanitized.includes('.')) {
+          const decimalSeparator = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.') ? ',' : '.';
+          const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+          return Number.parseFloat(
+            sanitized
+              .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
+              .replace(decimalSeparator, '.')
+          );
+        }
+
+        if (sanitized.includes(',')) {
+          const [integerPart = '', fractionalPart = ''] = sanitized.split(',');
+          if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+            return Number.parseFloat(integerPart + fractionalPart);
+          }
+          return Number.parseFloat(sanitized.replace(',', '.'));
+        }
+
+        if (sanitized.includes('.')) {
+          const [integerPart = '', fractionalPart = ''] = sanitized.split('.');
+          if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+            return Number.parseFloat(integerPart + fractionalPart);
+          }
+          return Number.parseFloat(sanitized);
+        }
+
+        return Number.parseFloat(sanitized);
+      };
+    },
     discountPercentage() {
       const rawDiscount = this.product?.DESCONTO ?? 0;
-      const discountValue = parseFloat(rawDiscount);
+      const discountValue = Number.parseFloat(String(rawDiscount ?? '0').replace(',', '.'));
       if (Number.isNaN(discountValue)) return 0;
       return Math.max(0, Math.min(100, discountValue));
     },
@@ -17,15 +59,15 @@ export default {
       return this.discountPercentage > 0;
     },
     finalPrice() {
-      const initialPrice = parseFloat(this.product?.PREÇO);
+      const initialPrice = this.parseCurrencyNumber(this.product?.PREÇO);
       if (Number.isNaN(initialPrice)) return this.product?.PREÇO;
       if (!this.hasDiscount) return initialPrice;
       return initialPrice * (1 - this.discountPercentage / 100);
     },
     formattedPrice() {
       if (!this.product?.PREÇO) return '';
-      const n = parseFloat(this.finalPrice);
-      return isNaN(n)
+      const n = this.parseCurrencyNumber(this.finalPrice);
+      return Number.isNaN(n)
         ? this.product.PREÇO
         : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     },
@@ -172,6 +214,24 @@ export default {
           <span v-if="selectedSizeAvailable === 0" class="detail-size-note">
             Tamanho selecionado sem estoque.
           </span>
+        </div>
+
+        <!-- Frete -->
+        <div class="detail-shipping-block">
+          <label class="detail-section-label" for="cep-frete">Calcular frete</label>
+          <div class="detail-shipping-input-row">
+            <input
+              id="cep-frete"
+              class="detail-shipping-input"
+              type="text"
+              inputmode="numeric"
+              maxlength="9"
+              placeholder="Digite seu CEP"
+              aria-label="Digite seu CEP"
+            />
+            <button type="button" class="detail-shipping-btn">Calcular</button>
+          </div>
+          <span class="detail-shipping-hint">Informe o CEP para consultar o prazo e valor do frete.</span>
         </div>
 
         <!-- Quantidade -->
