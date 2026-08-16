@@ -7,6 +7,9 @@ export default {
   },
   emits: ['increase-qty', 'decrease-qty', 'add-to-cart', 'buy-now', 'size-selected'],
   computed: {
+    selectedShippingOption() {
+      return this.shippingOptions.find((option) => option.service === this.selectedShipping) || null;
+    },
     parseCurrencyNumber() {
       return (value) => {
         if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -228,10 +231,53 @@ export default {
               maxlength="9"
               placeholder="Digite seu CEP"
               aria-label="Digite seu CEP"
+              v-model="cepInput"
+              @input="onCepInput"
+              @keyup.enter="calcularFrete"
             />
-            <button type="button" class="detail-shipping-btn">Calcular</button>
+            <button
+              type="button"
+              class="detail-shipping-btn"
+              @click="calcularFrete"
+              :disabled="shippingLoading"
+            >
+              {{ shippingLoading ? 'Calculando...' : 'Calcular' }}
+            </button>
           </div>
-          <span class="detail-shipping-hint">Informe o CEP para consultar o prazo e valor do frete.</span>
+          <span v-if="!shippingError && !shippingOptions.length" class="detail-shipping-hint">
+            Informe o CEP para consultar o prazo e valor do frete.
+          </span>
+
+          <div v-if="shippingError" class="detail-shipping-status detail-shipping-status--error">
+            {{ shippingError }}
+          </div>
+
+          <div v-if="shippingOptions.length" class="detail-shipping-results">
+            <div class="detail-shipping-results-title">Selecione uma opção de entrega</div>
+            <button
+              v-for="option in shippingOptions"
+              :key="option.service"
+              type="button"
+              class="detail-shipping-option"
+              :class="{ 'detail-shipping-option--selected': option.service === selectedShipping }"
+              @click="selectShipping(option)"
+            >
+              <div class="detail-shipping-option-header">
+                <div class="detail-shipping-option-main">
+                  <strong>{{ option.service }}</strong>
+                  <span>{{ formatShippingPrice(option.price) }}</span>
+                </div>
+                <span
+                  class="detail-shipping-toggle"
+                  :class="{ 'detail-shipping-toggle--selected': option.service === selectedShipping }"
+                  aria-hidden="true"
+                ></span>
+              </div>
+              <div class="detail-shipping-option-meta">
+                {{ formatDeliveryEstimate(option.deliveryDays) }}
+              </div>
+            </button>
+          </div>
         </div>
 
         <!-- Quantidade -->
@@ -260,7 +306,7 @@ export default {
 
         <!-- Ações -->
         <div class="detail-actions">
-          <button class="detail-btn detail-btn--primary" @click="$emit('buy-now', selectedSize)">
+          <button class="detail-btn detail-btn--primary" @click="handleBuyNow">
             <i class="ri-zap-line"></i>
             Comprar agora
           </button>
@@ -313,10 +359,149 @@ export default {
     return {
       copied: false,
       selectedSize: null,
+      selectedShipping: '',
       sizeDropdownOpen: false,
+      cepInput: '',
+      shippingLoading: false,
+      shippingError: null,
+      shippingOptions: [],
     };
   },
   methods: {
+    normalizeShippingOption(option) {
+      if (!option || typeof option !== 'object') return null;
+
+      const service = String(option.service || option.name || option.label || '').trim().toUpperCase();
+      const code = String(option.code || option.id || '').trim().toUpperCase();
+      const price = Number(option.price ?? option.value ?? 0);
+      const deadline = Number(option.deadline ?? option.deliveryDays ?? option.days ?? 0);
+
+      const normalizedService = service === 'PAC' || service === 'SEDEX'
+        ? service
+        : (code === '04014' ? 'PAC' : code === '04510' ? 'SEDEX' : service || code || 'ENTREGA');
+
+      return {
+        service: normalizedService,
+        code: code || normalizedService,
+        price: Number.isFinite(price) ? price : 0,
+        deliveryDays: Number.isFinite(deadline) ? deadline : 0,
+      };
+    },
+    handleBuyNow() {
+      if (!this.selectedSize) {
+        alert('Selecione um tamanho antes de continuar com o pagamento.');
+        return;
+      }
+
+      const cepDigits = this.cepInput.replace(/\D/g, '');
+      if (cepDigits.length !== 8) {
+        alert('Informe e calcule seu CEP antes de continuar com o pagamento.');
+        return;
+      }
+
+      if (!this.shippingOptions.length) {
+        alert('Calcule o frete antes de continuar com o pagamento.');
+        return;
+      }
+
+      if (!this.selectedShipping) {
+        alert('Selecione PAC ou SEDEX antes de continuar com o pagamento.');
+        return;
+      }
+
+      const selectedShipping = this.selectedShippingOption;
+      if (!selectedShipping) {
+        alert('Selecione uma opção de entrega válida antes de continuar com o pagamento.');
+        return;
+      }
+
+      this.$emit('buy-now', {
+        selectedSize: this.selectedSize,
+        shipping: selectedShipping,
+        cep: cepDigits,
+      });
+    },
+    onCepInput() {
+      // Máscara simples: 00000-000
+      let digits = this.cepInput.replace(/\D/g, '').slice(0, 8);
+      if (digits.length > 5) {
+        digits = `${digits.slice(0, 5)}-${digits.slice(5)}`;
+      }
+      this.cepInput = digits;
+      // Limpa resultados/erros anteriores ao editar o CEP
+      this.shippingError = null;
+      this.shippingOptions = [];
+      this.selectedShipping = '';
+    },
+    formatShippingPrice(value) {
+      const n = Number(value);
+      return Number.isFinite(n)
+        ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : '—';
+    },
+    formatDeliveryEstimate(days) {
+      if (!days) return 'Prazo a confirmar';
+      const n = Number(days);
+      if (!Number.isFinite(n)) return 'Prazo a confirmar';
+      return n === 1 ? 'Chega em até 1 dia útil' : `Chega em até ${n} dias úteis`;
+    },
+    async calcularFrete() {
+      const cepDigits = this.cepInput.replace(/\D/g, '');
+
+      if (cepDigits.length !== 8) {
+        this.shippingError = 'Digite um CEP válido com 8 dígitos.';
+        this.shippingOptions = [];
+        return;
+      }
+
+      const productId = this.product?.ID;
+      if (!productId) {
+        this.shippingError = 'Produto não carregado. Recarregue a página.';
+        return;
+      }
+
+      this.shippingLoading = true;
+      this.shippingError = null;
+      this.shippingOptions = [];
+
+      try {
+        const SUPABASE_URL = 'https://hovfcntzthahwszjaxsw.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvdmZjbnR6dGhhaHdzempheHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMDgxNDUsImV4cCI6MjA5Mzc4NDE0NX0.Pss5O_ykTybPUsuZCCln72Pq5dkTGMQ1G1kXR4HOVyw';
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/calcular-frete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'apikey': SUPABASE_KEY,
+          },
+          body: JSON.stringify({
+            productId,
+            cepDestino: cepDigits,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          this.shippingError = data.error || 'Não foi possível calcular o frete.';
+          return;
+        }
+
+        const normalizedOptions = (data.options || []).map((option) => this.normalizeShippingOption(option));
+        this.shippingOptions = normalizedOptions.filter(Boolean);
+        this.selectedShipping = '';
+
+        if (!this.shippingOptions.length) {
+          this.shippingError = 'Nenhuma opção de frete disponível para este CEP.';
+        }
+      } catch (err) {
+        console.error('Erro ao calcular frete:', err);
+        this.shippingError = 'Erro de conexão ao calcular o frete. Tente novamente.';
+      } finally {
+        this.shippingLoading = false;
+      }
+    },
     copyLink() {
       if (!this.currentUrl) return;
       navigator.clipboard?.writeText(this.currentUrl).then(() => {
@@ -338,6 +523,10 @@ export default {
       this.selectedSize = option.label;
       this.$emit('size-selected', { label: option.label, quantity: option.quantity });
       this.closeSizeDropdown();
+    },
+    selectShipping(option) {
+      if (!option || !option.service) return;
+      this.selectedShipping = option.service;
     },
     onDocumentClick(event) {
       if (!this.$el.contains(event.target)) {

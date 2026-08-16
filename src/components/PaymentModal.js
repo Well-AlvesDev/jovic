@@ -7,6 +7,8 @@ export default {
     product: { type: Object, default: null },
     quantity: { type: Number, default: 1 },
     selectedSize: { type: String, default: '' },
+    selectedShipping: { type: Object, default: null },
+    shippingCep: { type: String, default: '' },
   },
   emits: ['close', 'confirm'],
   data() {
@@ -47,6 +49,11 @@ export default {
     },
     selectedSizeLabel() {
       return this.selectedSize || 'Não informado';
+    },
+    selectedShippingLabel() {
+      if (!this.selectedShipping) return 'Não informado';
+      const price = Number(this.selectedShipping.price ?? 0);
+      return `${this.selectedShipping.service || 'Entrega'}${Number.isFinite(price) && price > 0 ? ` • ${price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}`;
     },
     totalAmount() {
       const parseCurrencyNumber = (value) => {
@@ -218,6 +225,14 @@ export default {
           alert('Selecione um tamanho antes de confirmar o Pix.');
           return;
         }
+        if (!this.selectedShipping || !this.selectedShipping.service) {
+          alert('Selecione PAC ou SEDEX antes de confirmar o Pix.');
+          return;
+        }
+        if (!this.shippingCep || String(this.shippingCep).replace(/\D/g, '').length !== 8) {
+          alert('Informe e calcule o CEP antes de confirmar o Pix.');
+          return;
+        }
 
         this.isSubmitting = true;
         this.loadingMessage = 'Validando estoque e gerando QR Code...';
@@ -309,6 +324,7 @@ export default {
               <div class="pm-product-info">
                 <strong class="pm-product-name">{{ productLabel }}</strong>
                 <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Qtd: {{ quantity }}</span>
+                <span class="pm-product-qty" v-if="selectedShippingLabel !== 'Não informado'">Entrega: {{ selectedShippingLabel }}{{ shippingCep ? ' · CEP ' + shippingCep : '' }}</span>
               </div>
               <div class="pm-product-total">{{ totalAmount }}</div>
             </div>

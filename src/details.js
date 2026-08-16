@@ -56,6 +56,8 @@ createApp({
     const quantity = ref(1);
     const maxQuantity = ref(null);
     const selectedSize = ref('');
+    const selectedShipping = ref(null);
+    const shippingCep = ref('');
     const showPaymentModal = ref(false);
     const debugMode = ref(false);
 
@@ -134,6 +136,11 @@ createApp({
         return;
       }
 
+      const activeShipping =
+        (sizeOverride && typeof sizeOverride === 'object' && sizeOverride.shipping)
+          ? sizeOverride.shipping
+          : selectedShipping.value;
+
       const activeSize =
         (typeof sizeOverride === 'string' && sizeOverride.trim())
           ? sizeOverride
@@ -146,7 +153,17 @@ createApp({
         return;
       }
 
+      if (!activeShipping || !activeShipping.service) {
+        alert('Informe e calcule o CEP e selecione PAC ou SEDEX antes de continuar com o pagamento.');
+        return;
+      }
+
+      if (sizeOverride && typeof sizeOverride === 'object' && sizeOverride.cep) {
+        shippingCep.value = sizeOverride.cep;
+      }
+
       selectedSize.value = activeSize;
+      selectedShipping.value = activeShipping;
       showPaymentModal.value = true;
     }
 
@@ -204,6 +221,8 @@ createApp({
       breadcrumbItems,
       quantity,
       selectedSize,
+      selectedShipping,
+      shippingCep,
       menuOpen,
       cartCount,
       store: STORE_CONFIG,
@@ -297,6 +316,8 @@ createApp({
         :product="product"
         :quantity="quantity"
         :selectedSize="selectedSize"
+        :selectedShipping="selectedShipping"
+        :shippingCep="shippingCep"
         :debugMode="debugMode"
         @close="closeModal"
         @confirm="onPaymentConfirm"
