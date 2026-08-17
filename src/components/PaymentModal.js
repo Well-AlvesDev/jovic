@@ -1,5 +1,66 @@
 import { SUPABASE_CONFIG } from '../config.js';
 
+export function truncateProductName(value, maxLength = 30) {
+  const text = String(value ?? '').trim();
+  if (!text) return 'Item';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}...`;
+}
+
+export function calculateProductTotal(product = {}, quantity = 1) {
+  const parseCurrencyNumber = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+    const sanitized = String(value ?? '')
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/[^\d,.-]/g, '');
+
+    if (!sanitized || sanitized === '-' || sanitized === '.' || sanitized === ',') {
+      return Number.NaN;
+    }
+
+    if (sanitized.includes(',') && sanitized.includes('.')) {
+      const decimalSeparator = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.') ? ',' : '.';
+      const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+      return Number.parseFloat(
+        sanitized
+          .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
+          .replace(decimalSeparator, '.')
+      );
+    }
+
+    if (sanitized.includes(',')) {
+      const [integerPart = '', fractionalPart = ''] = sanitized.split(',');
+      if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+        return Number.parseFloat(integerPart + fractionalPart);
+      }
+      return Number.parseFloat(sanitized.replace(',', '.'));
+    }
+
+    if (sanitized.includes('.')) {
+      const [integerPart = '', fractionalPart = ''] = sanitized.split('.');
+      if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+        return Number.parseFloat(integerPart + fractionalPart);
+      }
+      return Number.parseFloat(sanitized);
+    }
+
+    return Number.parseFloat(sanitized);
+  };
+
+  const price = parseCurrencyNumber(product?.PREÇO) || 0;
+  const discount = Number.parseFloat(String(product?.DESCONTO ?? '0').replace(',', '.')) || 0;
+  const finalPrice = price * (1 - discount / 100);
+  return Number(((finalPrice * (Number(quantity) || 1))).toFixed(2));
+}
+
+export function calculateFinalTotal(product = {}, quantity = 1, selectedShipping = null) {
+  const subtotal = calculateProductTotal(product, quantity);
+  const shipping = Number(selectedShipping?.price ?? 0);
+  return Number((subtotal + shipping).toFixed(2));
+}
+
 export default {
   name: 'PaymentModal',
   props: {
@@ -45,7 +106,7 @@ export default {
   },
   computed: {
     productLabel() {
-      return this.product?.PRODUTO || 'Item';
+      return truncateProductName(this.product?.PRODUTO, 30);
     },
     selectedSizeLabel() {
       return this.selectedSize || 'Não informado';
@@ -55,52 +116,17 @@ export default {
       const price = Number(this.selectedShipping.price ?? 0);
       return `${this.selectedShipping.service || 'Entrega'}${Number.isFinite(price) && price > 0 ? ` • ${price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}`;
     },
+    shippingPriceLabel() {
+      if (!this.selectedShipping) return '';
+      const price = Number(this.selectedShipping.price ?? 0);
+      if (!Number.isFinite(price) || price <= 0) return 'Frete: grátis';
+      return `Frete: ${price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+    },
     totalAmount() {
-      const parseCurrencyNumber = (value) => {
-        if (typeof value === 'number' && Number.isFinite(value)) return value;
-
-        const sanitized = String(value ?? '')
-          .trim()
-          .replace(/\s+/g, '')
-          .replace(/[^\d,.-]/g, '');
-
-        if (!sanitized || sanitized === '-' || sanitized === '.' || sanitized === ',') {
-          return Number.NaN;
-        }
-
-        if (sanitized.includes(',') && sanitized.includes('.')) {
-          const decimalSeparator = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.') ? ',' : '.';
-          const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
-          return Number.parseFloat(
-            sanitized
-              .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
-              .replace(decimalSeparator, '.')
-          );
-        }
-
-        if (sanitized.includes(',')) {
-          const [integerPart = '', fractionalPart = ''] = sanitized.split(',');
-          if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
-            return Number.parseFloat(integerPart + fractionalPart);
-          }
-          return Number.parseFloat(sanitized.replace(',', '.'));
-        }
-
-        if (sanitized.includes('.')) {
-          const [integerPart = '', fractionalPart = ''] = sanitized.split('.');
-          if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
-            return Number.parseFloat(integerPart + fractionalPart);
-          }
-          return Number.parseFloat(sanitized);
-        }
-
-        return Number.parseFloat(sanitized);
-      };
-
-      const price = parseCurrencyNumber(this.product?.PREÇO) || 0;
-      const discount = Number.parseFloat(String(this.product?.DESCONTO ?? '0').replace(',', '.')) || 0;
-      const finalPrice = price * (1 - discount / 100);
-      return (finalPrice * (this.quantity || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      return calculateProductTotal(this.product, this.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+    finalAmount() {
+      return calculateFinalTotal(this.product, this.quantity, this.selectedShipping).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     },
     cardValid() {
       return (this.card.number.replace(/\s+/g, '').length >= 13) && this.card.name && this.card.expiry && (this.card.cvv.length >= 3);
@@ -323,10 +349,14 @@ export default {
             <div class="pm-product">
               <div class="pm-product-info">
                 <strong class="pm-product-name">{{ productLabel }}</strong>
-                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Qtd: {{ quantity }}</span>
-                <span class="pm-product-qty" v-if="selectedShippingLabel !== 'Não informado'">Entrega: {{ selectedShippingLabel }}{{ shippingCep ? ' · CEP ' + shippingCep : '' }}</span>
+                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Quantidade: {{ quantity }}</span>
               </div>
-              <div class="pm-product-total">{{ totalAmount }}</div>
+              <div class="pm-product-price-wrap">
+                <div class="pm-product-total">{{ totalAmount }}</div>
+                <div class="pm-product-shipping" v-if="shippingPriceLabel">{{ shippingPriceLabel }}</div>
+                <div class="pm-product-divider"></div>
+                <div class="pm-product-final">TOTAL: {{ finalAmount }}</div>
+              </div>
             </div>
 
             <div class="pm-methods" v-if="!(method === 'pix' && (isSubmitting || paymentResult))">
