@@ -349,13 +349,13 @@ export default {
             <div class="pm-product">
               <div class="pm-product-info">
                 <strong class="pm-product-name">{{ productLabel }}</strong>
-                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Quantidade: {{ quantity }}</span>
+                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Qtd: {{ quantity }}</span>
               </div>
               <div class="pm-product-price-wrap">
                 <div class="pm-product-total">{{ totalAmount }}</div>
                 <div class="pm-product-shipping" v-if="shippingPriceLabel">{{ shippingPriceLabel }}</div>
                 <div class="pm-product-divider"></div>
-                <div class="pm-product-final">TOTAL: {{ finalAmount }}</div>
+                <div class="pm-product-final">Total: {{ finalAmount }}</div>
               </div>
             </div>
 
