@@ -11,7 +11,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.26.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css">
-    <script src="./src/config.js"></script>
+    <script>
+        const SUPABASE_CONFIG = {
+            url: 'https://hovfcntzthahwszjaxsw.supabase.co',
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvdmZjbnR6dGhhaHdzempheHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMDgxNDUsImV4cCI6MjA5Mzc4NDE0NX0.Pss5O_ykTybPUsuZCCln72Pq5dkTGMQ1G1kXR4HOVyw',
+            table: 'j-box',
+            pixCheckoutUrl: 'https://hovfcntzthahwszjaxsw.supabase.co/functions/v1/pix-checkout'
+        };
+    </script>
     <style>
         * {
             margin: 0;

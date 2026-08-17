@@ -1,5 +1,66 @@
 import { SUPABASE_CONFIG } from '../config.js';
 
+export function truncateProductName(value, maxLength = 30) {
+  const text = String(value ?? '').trim();
+  if (!text) return 'Item';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}...`;
+}
+
+export function calculateProductTotal(product = {}, quantity = 1) {
+  const parseCurrencyNumber = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+    const sanitized = String(value ?? '')
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/[^\d,.-]/g, '');
+
+    if (!sanitized || sanitized === '-' || sanitized === '.' || sanitized === ',') {
+      return Number.NaN;
+    }
+
+    if (sanitized.includes(',') && sanitized.includes('.')) {
+      const decimalSeparator = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.') ? ',' : '.';
+      const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+      return Number.parseFloat(
+        sanitized
+          .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
+          .replace(decimalSeparator, '.')
+      );
+    }
+
+    if (sanitized.includes(',')) {
+      const [integerPart = '', fractionalPart = ''] = sanitized.split(',');
+      if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+        return Number.parseFloat(integerPart + fractionalPart);
+      }
+      return Number.parseFloat(sanitized.replace(',', '.'));
+    }
+
+    if (sanitized.includes('.')) {
+      const [integerPart = '', fractionalPart = ''] = sanitized.split('.');
+      if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+        return Number.parseFloat(integerPart + fractionalPart);
+      }
+      return Number.parseFloat(sanitized);
+    }
+
+    return Number.parseFloat(sanitized);
+  };
+
+  const price = parseCurrencyNumber(product?.PREÇO) || 0;
+  const discount = Number.parseFloat(String(product?.DESCONTO ?? '0').replace(',', '.')) || 0;
+  const finalPrice = price * (1 - discount / 100);
+  return Number(((finalPrice * (Number(quantity) || 1))).toFixed(2));
+}
+
+export function calculateFinalTotal(product = {}, quantity = 1, selectedShipping = null) {
+  const subtotal = calculateProductTotal(product, quantity);
+  const shipping = Number(selectedShipping?.price ?? 0);
+  return Number((subtotal + shipping).toFixed(2));
+}
+
 export default {
   name: 'PaymentModal',
   props: {
@@ -7,6 +68,8 @@ export default {
     product: { type: Object, default: null },
     quantity: { type: Number, default: 1 },
     selectedSize: { type: String, default: '' },
+    selectedShipping: { type: Object, default: null },
+    shippingCep: { type: String, default: '' },
   },
   emits: ['close', 'confirm'],
   data() {
@@ -19,6 +82,8 @@ export default {
       pixCode: '',
       copySuccess: false,
       paymentResult: null,
+      paymentStatus: 'idle',
+      paymentStatusTimer: null,
       pendingCheckoutData: null,
       pixForm: {
         fullName: '',
@@ -41,16 +106,27 @@ export default {
   },
   computed: {
     productLabel() {
-      return this.product?.PRODUTO || 'Item';
+      return truncateProductName(this.product?.PRODUTO, 30);
     },
     selectedSizeLabel() {
       return this.selectedSize || 'Não informado';
     },
+    selectedShippingLabel() {
+      if (!this.selectedShipping) return 'Não informado';
+      const price = Number(this.selectedShipping.price ?? 0);
+      return `${this.selectedShipping.service || 'Entrega'}${Number.isFinite(price) && price > 0 ? ` • ${price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}`;
+    },
+    shippingPriceLabel() {
+      if (!this.selectedShipping) return '';
+      const price = Number(this.selectedShipping.price ?? 0);
+      if (!Number.isFinite(price) || price <= 0) return 'Frete: grátis';
+      return `Frete: ${price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+    },
     totalAmount() {
-      const price = Number.parseFloat(String(this.product?.PREÇO ?? '').replace(/[\.]/g, '').replace(',', '.')) || 0;
-      const discount = Number(this.product?.DESCONTO || 0);
-      const finalPrice = price * (1 - discount / 100);
-      return (finalPrice * (this.quantity || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      return calculateProductTotal(this.product, this.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    },
+    finalAmount() {
+      return calculateFinalTotal(this.product, this.quantity, this.selectedShipping).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     },
     cardValid() {
       return (this.card.number.replace(/\s+/g, '').length >= 13) && this.card.name && this.card.expiry && (this.card.cvv.length >= 3);
@@ -70,6 +146,8 @@ export default {
         this.copySuccess = false;
         this.paymentResult = null;
         this.pendingCheckoutData = null;
+        this.paymentStatus = 'idle';
+        this.clearPaymentStatusPolling();
         this.isSubmitting = false;
         this.loadingMessage = 'Validando dados do pedido...';
       }
@@ -78,7 +156,56 @@ export default {
   methods: {
     close() {
       if (this.isSubmitting) return;
+      this.clearPaymentStatusPolling();
       this.$emit('close');
+    },
+    clearPaymentStatusPolling() {
+      if (this.paymentStatusTimer) {
+        clearInterval(this.paymentStatusTimer);
+        this.paymentStatusTimer = null;
+      }
+    },
+    async checkPaymentStatus(paymentId) {
+      if (!paymentId) return;
+
+      try {
+        const response = await fetch(`${SUPABASE_CONFIG.pixCheckoutUrl}?paymentId=${encodeURIComponent(paymentId)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_CONFIG.anonKey,
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        if (!data?.ok || !data?.paymentId) {
+          return;
+        }
+
+        this.paymentResult = { ...this.paymentResult, ...data, status: data.status || this.paymentResult?.status || 'pending' };
+        this.paymentStatus = data.status || this.paymentStatus || 'pending';
+
+        if (this.paymentStatus === 'approved') {
+          this.clearPaymentStatusPolling();
+          this.isSubmitting = false;
+          this.loadingMessage = 'Pagamento concluído';
+        }
+      } catch (error) {
+        console.error('Erro ao consultar status do pagamento PIX:', error);
+      }
+    },
+    startPaymentStatusPolling(paymentId) {
+      this.clearPaymentStatusPolling();
+      if (!paymentId) return;
+
+      this.checkPaymentStatus(paymentId);
+      this.paymentStatusTimer = setInterval(() => {
+        this.checkPaymentStatus(paymentId);
+      }, 5000);
     },
     selectMethod(m) {
       if (this.isSubmitting) return;
@@ -122,6 +249,14 @@ export default {
         }
         if (!this.selectedSize) {
           alert('Selecione um tamanho antes de confirmar o Pix.');
+          return;
+        }
+        if (!this.selectedShipping || !this.selectedShipping.service) {
+          alert('Selecione PAC ou SEDEX antes de confirmar o Pix.');
+          return;
+        }
+        if (!this.shippingCep || String(this.shippingCep).replace(/\D/g, '').length !== 8) {
+          alert('Informe e calcule o CEP antes de confirmar o Pix.');
           return;
         }
 
@@ -170,11 +305,17 @@ export default {
           }
 
           this.paymentResult = data;
+          this.paymentStatus = data?.status || 'pending';
           this.pixQrCode = data.qrCodeBase64 ? `data:image/png;base64,${data.qrCodeBase64}` : (data.qrCode || '');
           this.pixTicketUrl = data.ticketUrl || '';
-          this.pixCode = data.qrCode || '';
+          this.pixCode = data.qrCode || data.ticketUrl || 'PIX gerado com sucesso';
           this.isSubmitting = false;
-          this.loadingMessage = 'Pagamento PIX pronto';
+          this.loadingMessage = this.paymentStatus === 'approved' ? 'Pagamento concluído' : 'Pagamento PIX pronto';
+
+          if (data?.paymentId) {
+            this.startPaymentStatusPolling(data.paymentId);
+          }
+
           this.$emit('confirm', { method: 'pix', customer: { ...this.pixForm }, product: this.product, quantity: this.quantity, size: this.selectedSize, payment: data, formSnapshot: this.pendingCheckoutData });
           return;
         } catch (error) {
@@ -210,7 +351,12 @@ export default {
                 <strong class="pm-product-name">{{ productLabel }}</strong>
                 <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Qtd: {{ quantity }}</span>
               </div>
-              <div class="pm-product-total">{{ totalAmount }}</div>
+              <div class="pm-product-price-wrap">
+                <div class="pm-product-total">{{ totalAmount }}</div>
+                <div class="pm-product-shipping" v-if="shippingPriceLabel">{{ shippingPriceLabel }}</div>
+                <div class="pm-product-divider"></div>
+                <div class="pm-product-final">Total: {{ finalAmount }}</div>
+              </div>
             </div>
 
             <div class="pm-methods" v-if="!(method === 'pix' && (isSubmitting || paymentResult))">
@@ -229,11 +375,31 @@ export default {
                     <p>{{ loadingMessage }}</p>
                   </div>
 
-                  <template v-else-if="paymentResult && pixQrCode">
+                  <template v-else-if="paymentStatus === 'approved' && paymentResult">
                     <div class="pm-pix-result">
-                      <p class="pm-note">Escaneie o QR Code abaixo para finalizar o pagamento PIX.</p>
-                      <div class="pm-qr-box">
-                        <img v-if="pixQrCode" :src="pixQrCode" alt="QR Code PIX" class="pm-qr-image" />
+                      <p class="pm-note">Pagamento confirmado com sucesso!</p>
+                      <div class="pm-success-box">
+                        <i class="ri-check-double-line" style="font-size: 2rem; color: #24b36b;"></i>
+                        <h4 style="margin: 12px 0 8px;">Seu PIX foi aprovado</h4>
+                        <p>Pedido confirmado e o pagamento foi concluído.</p>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template v-else-if="paymentResult && (pixQrCode || pixTicketUrl || pixCode)">
+                    <div class="pm-pix-result">
+                      <p class="pm-note">
+                        {{ pixQrCode ? 'Escaneie o QR Code abaixo para finalizar o pagamento PIX.' : 'Seu pagamento PIX foi gerado com sucesso. Use o código ou o link abaixo para concluir o pagamento.' }}
+                      </p>
+
+                      <div v-if="pixQrCode" class="pm-qr-box">
+                        <img :src="pixQrCode" alt="QR Code PIX" class="pm-qr-image" />
+                      </div>
+
+                      <div v-if="pixTicketUrl" class="pm-ticket-link-wrap">
+                        <a :href="pixTicketUrl" target="_blank" rel="noopener noreferrer" class="pm-ticket-link">
+                          Abrir link do pagamento PIX
+                        </a>
                       </div>
 
                       <div class="pm-pix-copy-row" v-if="pixCode" @click.prevent="copyPix">

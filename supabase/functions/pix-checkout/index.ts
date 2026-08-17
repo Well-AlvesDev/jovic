@@ -73,11 +73,19 @@ function parseCurrencyNumber(value: string | number) {
   }
 
   if (hasComma) {
+    const [integerPart = '', fractionalPart = ''] = sanitized.split(',');
+    if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+      return Number.parseFloat(integerPart + fractionalPart);
+    }
     return Number.parseFloat(sanitized.replace(',', '.'));
   }
 
-  if (hasDot && sanitized.split('.').length > 2) {
-    return Number.parseFloat(sanitized.replace(/\./g, ''));
+  if (hasDot) {
+    const [integerPart = '', fractionalPart = ''] = sanitized.split('.');
+    if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+      return Number.parseFloat(integerPart + fractionalPart);
+    }
+    return Number.parseFloat(sanitized);
   }
 
   return Number.parseFloat(sanitized);
@@ -118,12 +126,68 @@ function buildCorsHeaders(request: Request) {
 }
 
 Deno.serve(async (req) => {
-  // AJUSTE AQUI: Responda com 'ok' e status 200
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       status: 200,
       headers: buildCorsHeaders(req),
     });
+  }
+
+  if (req.method === 'GET') {
+    try {
+      const url = new URL(req.url);
+      const paymentId = url.searchParams.get('paymentId');
+
+      if (!paymentId) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'paymentId obrigatório.' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) } },
+        );
+      }
+
+      if (!MERCADO_PAGO_ACCESS_TOKEN) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Token do Mercado Pago não configurado.' }),
+          { status: 500, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) } },
+        );
+      }
+
+      const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!mpResponse.ok) {
+        const errorText = await mpResponse.text();
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Erro ao consultar status do pagamento.', details: errorText }),
+          { status: 502, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) } },
+        );
+      }
+
+      const payment = await mpResponse.json();
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          paymentId: payment?.id ?? null,
+          status: payment?.status ?? 'pending',
+          status_detail: payment?.status_detail ?? null,
+          transaction_amount: Number(payment?.transaction_amount ?? 0).toFixed(2),
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) },
+        },
+      );
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Erro ao consultar o status do pagamento.', details: error instanceof Error ? error.message : String(error) }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...buildCorsHeaders(req) } },
+      );
+    }
   }
 
   if (req.method !== 'POST') {
@@ -135,8 +199,6 @@ Deno.serve(async (req) => {
       },
     );
   }
-
-  // ... (o resto do seu bloco try/catch continua exatamente igual)
 
   try {
     const payload = await req.json();

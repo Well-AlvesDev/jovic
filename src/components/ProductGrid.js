@@ -205,14 +205,54 @@ export default {
                 this.isLoadingProducts = false;
             }
         },
+        parseCurrencyNumber(value) {
+            if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+            const sanitized = String(value ?? '')
+                .trim()
+                .replace(/\s+/g, '')
+                .replace(/[^\d,.-]/g, '');
+
+            if (!sanitized || sanitized === '-' || sanitized === '.' || sanitized === ',') {
+                return Number.NaN;
+            }
+
+            if (sanitized.includes(',') && sanitized.includes('.')) {
+                const decimalSeparator = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.') ? ',' : '.';
+                const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+                return Number.parseFloat(
+                    sanitized
+                        .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
+                        .replace(decimalSeparator, '.')
+                );
+            }
+
+            if (sanitized.includes(',')) {
+                const [integerPart = '', fractionalPart = ''] = sanitized.split(',');
+                if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+                    return Number.parseFloat(integerPart + fractionalPart);
+                }
+                return Number.parseFloat(sanitized.replace(',', '.'));
+            }
+
+            if (sanitized.includes('.')) {
+                const [integerPart = '', fractionalPart = ''] = sanitized.split('.');
+                if (fractionalPart && fractionalPart.length === 3 && /^\d{1,}$/.test(integerPart)) {
+                    return Number.parseFloat(integerPart + fractionalPart);
+                }
+                return Number.parseFloat(sanitized);
+            }
+
+            return Number.parseFloat(sanitized);
+        },
         getDiscountPercentage(product) {
             const rawDiscount = product?.DESCONTO ?? 0;
-            const discountValue = parseFloat(rawDiscount);
+            const discountValue = Number.parseFloat(String(rawDiscount).replace(',', '.'));
             if (Number.isNaN(discountValue)) return 0;
             return Math.max(0, Math.min(100, discountValue));
         },
         getFinalPrice(product) {
-            const initialPrice = parseFloat(product?.PREÇO);
+            const initialPrice = this.parseCurrencyNumber(product?.PREÇO);
             if (Number.isNaN(initialPrice)) return product?.PREÇO;
 
             const discountPercent = this.getDiscountPercentage(product);
@@ -221,9 +261,8 @@ export default {
             return initialPrice * (1 - discountPercent / 100);
         },
         formatPrice(price) {
-            // Converte para número e formata como moeda brasileira
-            const numPrice = parseFloat(price);
-            return isNaN(numPrice) ? price : 'R$ ' + numPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const numPrice = this.parseCurrencyNumber(price);
+            return Number.isNaN(numPrice) ? price : 'R$ ' + numPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         },
         getProductImages(product) {
             if (!product || !product['IMAGE-URL']) return [];

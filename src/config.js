@@ -6,4 +6,9 @@ const SUPABASE_CONFIG = {
     pixCheckoutUrl: 'https://hovfcntzthahwszjaxsw.supabase.co/functions/v1/pix-checkout'
 };
 
+if (typeof window !== 'undefined') {
+    window.SUPABASE_CONFIG = SUPABASE_CONFIG;
+}
+
 export { SUPABASE_CONFIG };
+export default SUPABASE_CONFIG;
