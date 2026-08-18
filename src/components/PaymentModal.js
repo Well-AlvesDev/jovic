@@ -7,6 +7,20 @@ export function truncateProductName(value, maxLength = 30) {
   return `${text.slice(0, maxLength).trimEnd()}...`;
 }
 
+export function normalizeViaCepAddress(address = {}) {
+  const street = String(address.logradouro ?? '').trim();
+  const neighborhood = String(address.bairro ?? '').trim();
+  const complementParts = [address.complemento, address.complemento2]
+    .filter((value) => String(value ?? '').trim())
+    .map((value) => String(value).trim());
+
+  return {
+    street,
+    neighborhood,
+    complement: complementParts.join(' '),
+  };
+}
+
 export function calculateProductTotal(product = {}, quantity = 1) {
   const parseCurrencyNumber = (value) => {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -76,6 +90,7 @@ export default {
     return {
       method: 'pix',
       isSubmitting: false,
+      isLoadingAddress: false,
       loadingMessage: 'Validando dados do pedido...',
       pixQrCode: '',
       pixTicketUrl: '',
@@ -149,8 +164,17 @@ export default {
         this.paymentStatus = 'idle';
         this.clearPaymentStatusPolling();
         this.isSubmitting = false;
+        this.isLoadingAddress = false;
         this.loadingMessage = 'Validando dados do pedido...';
+        this.pixForm.cep = this.formatCep(this.shippingCep || '');
+        this.loadAddressFromCep();
       }
+    },
+    'pixForm.cep': function (newValue) {
+      if (!newValue || String(newValue).replace(/\D/g, '').length !== 8) {
+        return;
+      }
+      this.loadAddressFromCep();
     }
   },
   methods: {
@@ -223,6 +247,55 @@ export default {
     },
     sanitizeCpf(value) {
       return String(value || '').replace(/\D/g, '');
+    },
+    formatCpf(value = '') {
+      const digits = String(value).replace(/\D/g, '').slice(0, 11);
+      const formatted = digits
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+
+      return formatted;
+    },
+    formatCep(value = '') {
+      const digits = String(value).replace(/\D/g, '').slice(0, 8);
+      return digits.replace(/(\d{5})(\d)/, '$1-$2');
+    },
+    async loadAddressFromCep() {
+      const cepDigits = String(this.pixForm.cep || '').replace(/\D/g, '');
+      if (cepDigits.length !== 8) {
+        this.isLoadingAddress = false;
+        return;
+      }
+
+      this.isLoadingAddress = true;
+      this.pixForm.cep = this.formatCep(this.pixForm.cep || '');
+
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
+        const data = await response.json();
+
+        if (data?.erro) {
+          this.isLoadingAddress = false;
+          return;
+        }
+
+        const normalized = normalizeViaCepAddress(data);
+
+        if (normalized.street) {
+          this.pixForm.street = normalized.street;
+        }
+        if (normalized.neighborhood) {
+          this.pixForm.neighborhood = normalized.neighborhood;
+        }
+        if (normalized.complement) {
+          this.pixForm.complement = normalized.complement;
+        }
+      } catch (error) {
+        console.error('Erro ao consultar ViaCEP:', error);
+      } finally {
+        this.isLoadingAddress = false;
+      }
     },
     validatePixForm() {
       const f = this.pixForm;
@@ -349,13 +422,15 @@ export default {
             <div class="pm-product">
               <div class="pm-product-info">
                 <strong class="pm-product-name">{{ productLabel }}</strong>
-                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Qtd: {{ quantity }}</span>
+                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Quantidade: {{ quantity }}</span>
+                <div class="pm-product-total-row">
+                  <span class="pm-product-total-label">Total:</span>
+                  <span class="pm-product-final">{{ finalAmount }}</span>
+                </div>
               </div>
               <div class="pm-product-price-wrap">
                 <div class="pm-product-total">{{ totalAmount }}</div>
                 <div class="pm-product-shipping" v-if="shippingPriceLabel">{{ shippingPriceLabel }}</div>
-                <div class="pm-product-divider"></div>
-                <div class="pm-product-final">Total: {{ finalAmount }}</div>
               </div>
             </div>
 
@@ -370,7 +445,12 @@ export default {
             <div class="pm-method-panel">
               <template v-if="method==='pix'">
                 <div class="pm-pix">
-                  <div v-if="isSubmitting" class="pm-loader">
+                  <div v-if="isLoadingAddress" class="pm-loader">
+                    <div class="pm-loader-spinner"></div>
+                    <p>Processando informações</p>
+                  </div>
+
+                  <div v-else-if="isSubmitting" class="pm-loader">
                     <div class="pm-loader-spinner"></div>
                     <p>{{ loadingMessage }}</p>
                   </div>
@@ -425,7 +505,15 @@ export default {
 
                     <label class="pm-field">
                       <span>CPF</span>
-                      <input type="text" v-model="pixForm.cpf" :disabled="isSubmitting" inputmode="numeric" placeholder="000.000.000-00" />
+                      <input
+                        type="text"
+                        v-model="pixForm.cpf"
+                        :disabled="isSubmitting"
+                        inputmode="numeric"
+                        placeholder="000.000.000-00"
+                        @input="pixForm.cpf = formatCpf(pixForm.cpf)"
+                      />
+                      <small class="pm-helper-text">Formatação automática. Digite apenas números.</small>
                     </label>
 
                     <label class="pm-field">
@@ -441,11 +529,18 @@ export default {
                     <div class="pm-row">
                       <label class="pm-field small">
                         <span>CEP</span>
-                        <input type="text" v-model="pixForm.cep" :disabled="isSubmitting" inputmode="numeric" placeholder="00000-000" />
+                        <input
+                          type="text"
+                          v-model="pixForm.cep"
+                          :disabled="isSubmitting"
+                          inputmode="numeric"
+                          placeholder="00000-000"
+                          @input="pixForm.cep = formatCep(pixForm.cep)"
+                        />
                       </label>
                       <label class="pm-field small">
                         <span>Número</span>
-                        <input type="text" v-model="pixForm.number" :disabled="isSubmitting" placeholder="123" />
+                        <input type="text" v-model="pixForm.number" :disabled="isSubmitting" placeholder="Exemplo: 123" />
                       </label>
                     </div>
 
