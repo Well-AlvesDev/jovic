@@ -59,30 +59,47 @@
 
 .pm-product {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
     padding: 8px 0;
 }
 
 .pm-product-info {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
+    max-width: calc(100% - 120px);
 }
 
 .pm-product-name {
     display: block;
+    width: 100%;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .pm-product-qty {
     font-size: 13px;
     color: #666
+}
+
+.pm-product-total-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.pm-product-total-label {
+    font-size: 16px;
+    font-weight: 400;
+    color: #1d1d1d;
 }
 
 .pm-product-price-wrap {
@@ -105,13 +122,6 @@
     white-space: nowrap;
 }
 
-.pm-product-divider {
-    width: 100%;
-    height: 0.5px;
-    background: #cecece;
-    margin: 1px 0 1px;
-}
-
 .pm-product-final {
     font-weight: 600;
     font-size: 15px;
@@ -130,12 +140,42 @@
     padding: 10px;
     border: 1px solid #e6e6e6;
     background: #fafafa;
-    font-weight: 600
+    font-weight: 400;
+    border-radius: 16px;
+}
+
+.pm-method-pix,
+.pm-method-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+}
+
+.pm-method-pix i,
+.pm-method-icon i {
+    font-size: 1.3rem;
+    line-height: 1;
+}
+
+.pm-method-pix svg {
+    width: 1.3rem;
+    height: 1.3rem;
+    display: block;
+    flex-shrink: 0;
+}
+
+.pm-pix-logo {
+    width: 64px;
+    height: 32px;
+    object-fit: contain;
 }
 
 .pm-method.active {
-    background: #111;
-    color: #fff;
+    background: #10467d;
+    color: #f4f4f4;
     border-color: #111
 }
 
@@ -165,11 +205,13 @@
     color: #444;
 }
 
-.pm-field input {
+.pm-field input,
+.pm-field select {
     width: 100%;
     padding: 10px;
     border: 1px solid #e6e6e6;
     border-radius: 8px;
+    background: #fff;
 }
 
 .pm-row {
@@ -197,11 +239,20 @@
 }
 
 .pm-confirm {
-    background: #111;
+    background: #139b2e;
     color: #fff;
     border: 0;
     padding: 10px 14px;
     border-radius: 8px
+}
+
+.pm-confirm:hover:not(:disabled) {
+    background: #157347;
+}
+
+.pm-confirm:disabled {
+    background: #8fc9a9;
+    cursor: not-allowed;
 }
 
 .pm-loader {

@@ -173,7 +173,7 @@ createApp({
     }
 
     function onPaymentConfirm(paymentData) {
-      console.log('Checkout PIX processado:', paymentData);
+      console.log('Checkout processado:', paymentData);
     }
 
     function onDebugPayment() {

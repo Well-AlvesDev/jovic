@@ -7,6 +7,20 @@ export function truncateProductName(value, maxLength = 30) {
   return `${text.slice(0, maxLength).trimEnd()}...`;
 }
 
+export function normalizeViaCepAddress(address = {}) {
+  const street = String(address.logradouro ?? '').trim();
+  const neighborhood = String(address.bairro ?? '').trim();
+  const complementParts = [address.complemento, address.complemento2]
+    .filter((value) => String(value ?? '').trim())
+    .map((value) => String(value).trim());
+
+  return {
+    street,
+    neighborhood,
+    complement: complementParts.join(' '),
+  };
+}
+
 export function calculateProductTotal(product = {}, quantity = 1) {
   const parseCurrencyNumber = (value) => {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -61,6 +75,21 @@ export function calculateFinalTotal(product = {}, quantity = 1, selectedShipping
   return Number((subtotal + shipping).toFixed(2));
 }
 
+export const MAX_CARD_INSTALLMENTS = 6;
+export const SELLER_INTEREST_FREE_INSTALLMENTS = 3;
+
+export function normalizeCardInstallments(value = 1) {
+  const installments = Number.parseInt(value, 10);
+  if (!Number.isInteger(installments) || installments < 1) return 1;
+  return Math.min(installments, MAX_CARD_INSTALLMENTS);
+}
+
+export function getCardInterestPayer(installments = 1) {
+  return normalizeCardInstallments(installments) > SELLER_INTEREST_FREE_INSTALLMENTS
+    ? 'buyer'
+    : 'seller';
+}
+
 export default {
   name: 'PaymentModal',
   props: {
@@ -75,7 +104,14 @@ export default {
   data() {
     return {
       method: 'pix',
+      cardInstallments: 1,
+      cardInstallmentOptions: [],
+      cardInstallmentsBin: '',
+      isLoadingCardInstallments: false,
+      cardInstallmentsError: '',
+      cardInstallmentsRequestId: 0,
       isSubmitting: false,
+      isLoadingAddress: false,
       loadingMessage: 'Validando dados do pedido...',
       pixQrCode: '',
       pixTicketUrl: '',
@@ -131,6 +167,12 @@ export default {
     cardValid() {
       return (this.card.number.replace(/\s+/g, '').length >= 13) && this.card.name && this.card.expiry && (this.card.cvv.length >= 3);
     },
+    maxCardInstallments() {
+      return MAX_CARD_INSTALLMENTS;
+    },
+    sellerInterestFreeInstallments() {
+      return SELLER_INTEREST_FREE_INSTALLMENTS;
+    },
     pixButtonLabel() {
       if (this.isSubmitting) return 'Gerando QR Code...';
       return 'Confirmar';
@@ -140,6 +182,12 @@ export default {
     show(newVal) {
       if (newVal) {
         this.card = { number: '', name: '', expiry: '', cvv: '' };
+        this.cardInstallments = 1;
+        this.cardInstallmentOptions = [];
+        this.cardInstallmentsBin = '';
+        this.isLoadingCardInstallments = false;
+        this.cardInstallmentsError = '';
+        this.cardInstallmentsRequestId += 1;
         this.pixQrCode = '';
         this.pixTicketUrl = '';
         this.pixCode = '';
@@ -149,8 +197,20 @@ export default {
         this.paymentStatus = 'idle';
         this.clearPaymentStatusPolling();
         this.isSubmitting = false;
+        this.isLoadingAddress = false;
         this.loadingMessage = 'Validando dados do pedido...';
+        this.pixForm.cep = this.formatCep(this.shippingCep || '');
+        this.loadAddressFromCep();
       }
+    },
+    'pixForm.cep': function (newValue) {
+      if (!newValue || String(newValue).replace(/\D/g, '').length !== 8) {
+        return;
+      }
+      this.loadAddressFromCep();
+    },
+    'card.number': function () {
+      this.loadCardInstallments();
     }
   },
   methods: {
@@ -211,6 +271,56 @@ export default {
       if (this.isSubmitting) return;
       this.method = m;
     },
+    async loadCardInstallments() {
+      const bin = String(this.card.number || '').replace(/\D/g, '').slice(0, 6);
+
+      if (bin.length === 6 && bin === this.cardInstallmentsBin) return;
+
+      const requestId = ++this.cardInstallmentsRequestId;
+      this.cardInstallmentOptions = [];
+      this.cardInstallments = 1;
+      this.cardInstallmentsError = '';
+
+      if (bin.length !== 6) {
+        this.cardInstallmentsBin = '';
+        this.isLoadingCardInstallments = false;
+        return;
+      }
+
+      this.cardInstallmentsBin = bin;
+      this.isLoadingCardInstallments = true;
+      try {
+        const amount = calculateFinalTotal(this.product, this.quantity, this.selectedShipping).toFixed(2);
+        const response = await fetch(`${SUPABASE_CONFIG.cardInstallmentsUrl}?amount=${encodeURIComponent(amount)}&bin=${encodeURIComponent(bin)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_CONFIG.anonKey,
+          },
+        });
+        const data = await response.json();
+
+        if (requestId !== this.cardInstallmentsRequestId) return;
+        if (!response.ok || data?.ok === false) {
+          throw new Error(data?.error || 'Não foi possível consultar as parcelas.');
+        }
+
+        this.cardInstallmentOptions = Array.isArray(data?.installments)
+          ? data.installments.filter((option) => option.installments >= 1 && option.installments <= MAX_CARD_INSTALLMENTS)
+          : [];
+        if (this.cardInstallmentOptions.length === 0) {
+          this.cardInstallmentsError = 'Nenhuma opção de parcelamento disponível.';
+        }
+      } catch (error) {
+        if (requestId === this.cardInstallmentsRequestId) {
+          this.cardInstallmentsError = error.message || 'Não foi possível consultar as parcelas.';
+        }
+      } finally {
+        if (requestId === this.cardInstallmentsRequestId) {
+          this.isLoadingCardInstallments = false;
+        }
+      }
+    },
     copyPix() {
       const textToCopy = this.pixCode || this.pixTicketUrl || this.pixQrCode;
       if (!textToCopy) return;
@@ -223,6 +333,55 @@ export default {
     },
     sanitizeCpf(value) {
       return String(value || '').replace(/\D/g, '');
+    },
+    formatCpf(value = '') {
+      const digits = String(value).replace(/\D/g, '').slice(0, 11);
+      const formatted = digits
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+
+      return formatted;
+    },
+    formatCep(value = '') {
+      const digits = String(value).replace(/\D/g, '').slice(0, 8);
+      return digits.replace(/(\d{5})(\d)/, '$1-$2');
+    },
+    async loadAddressFromCep() {
+      const cepDigits = String(this.pixForm.cep || '').replace(/\D/g, '');
+      if (cepDigits.length !== 8) {
+        this.isLoadingAddress = false;
+        return;
+      }
+
+      this.isLoadingAddress = true;
+      this.pixForm.cep = this.formatCep(this.pixForm.cep || '');
+
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
+        const data = await response.json();
+
+        if (data?.erro) {
+          this.isLoadingAddress = false;
+          return;
+        }
+
+        const normalized = normalizeViaCepAddress(data);
+
+        if (normalized.street) {
+          this.pixForm.street = normalized.street;
+        }
+        if (normalized.neighborhood) {
+          this.pixForm.neighborhood = normalized.neighborhood;
+        }
+        if (normalized.complement) {
+          this.pixForm.complement = normalized.complement;
+        }
+      } catch (error) {
+        console.error('Erro ao consultar ViaCEP:', error);
+      } finally {
+        this.isLoadingAddress = false;
+      }
     },
     validatePixForm() {
       const f = this.pixForm;
@@ -239,6 +398,44 @@ export default {
       if (!f.neighborhood.trim()) { alert('Informe o Bairro.'); return false; }
       if (!f.number.trim()) { alert('Informe o número do endereço.'); return false; }
       return true;
+    },
+    validateCreditCustomerForm() {
+      const f = this.pixForm;
+      const onlyDigits = (s = '') => String(s).replace(/\D/g, '');
+      if (!f.fullName.trim()) { alert('Informe o nome completo.'); return false; }
+      if (onlyDigits(f.cpf).length !== 11) { alert('CPF inválido (11 dígitos).'); return false; }
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email || '')) { alert('E-mail inválido.'); return false; }
+      if (onlyDigits(f.phone).length < 8) { alert('Telefone inválido.'); return false; }
+      if (onlyDigits(f.cep).length !== 8) { alert('CEP inválido (8 dígitos).'); return false; }
+      if (!f.street.trim()) { alert('Informe a Rua/Avenida.'); return false; }
+      if (!f.neighborhood.trim()) { alert('Informe o Bairro.'); return false; }
+      if (!f.number.trim()) { alert('Informe o número do endereço.'); return false; }
+      return true;
+    },
+    validateCardInstallments() {
+      const installments = Number(this.cardInstallments);
+      if (!Number.isInteger(installments) || installments < 1 || installments > MAX_CARD_INSTALLMENTS) {
+        alert(`Selecione entre 1 e ${MAX_CARD_INSTALLMENTS} parcelas.`);
+        return false;
+      }
+      if (!this.cardInstallmentOptions.some((option) => option.installments === installments)) {
+        alert('Aguarde a consulta das condições de parcelamento.');
+        return false;
+      }
+      return true;
+    },
+    formatInstallmentAmount(installments) {
+      const amount = calculateFinalTotal(this.product, this.quantity, this.selectedShipping);
+      return (amount / normalizeCardInstallments(installments)).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      });
+    },
+    formatCurrency(value) {
+      return Number(value || 0).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      });
     },
     async confirm() {
       if (this.method === 'pix') {
@@ -326,8 +523,32 @@ export default {
         }
       }
 
+      if ((this.method === 'credit' || this.method === 'debit') && !this.validateCreditCustomerForm()) return;
+
+      if (this.method === 'credit' && !this.validateCardInstallments()) return;
+
       if ((this.method === 'credit' || this.method === 'debit') && this.cardValid) {
-        this.$emit('confirm', { method: this.method, card: { ...this.card }, product: this.product, quantity: this.quantity, size: this.selectedSize });
+        const customer = {
+          ...this.pixForm,
+          cpf: this.sanitizeCpf(this.pixForm.cpf),
+          phone: String(this.pixForm.phone || '').replace(/\D/g, ''),
+          cep: String(this.pixForm.cep || '').replace(/\D/g, ''),
+          number: String(this.pixForm.number || '').trim(),
+        };
+        this.$emit('confirm', {
+          method: this.method,
+          card: { ...this.card },
+          installments: this.method === 'credit' ? normalizeCardInstallments(this.cardInstallments) : 1,
+          installmentAmount: this.method === 'credit'
+            ? this.cardInstallmentOptions.find((option) => option.installments === normalizeCardInstallments(this.cardInstallments))?.installmentAmount ?? null
+            : null,
+          interestPayer: this.method === 'credit' ? getCardInterestPayer(this.cardInstallments) : null,
+          interestFree: this.method === 'credit' && normalizeCardInstallments(this.cardInstallments) <= SELLER_INTEREST_FREE_INSTALLMENTS,
+          customer,
+          product: this.product,
+          quantity: this.quantity,
+          size: this.selectedSize,
+        });
         return;
       }
       alert('Preencha os dados de pagamento corretamente.');
@@ -349,20 +570,31 @@ export default {
             <div class="pm-product">
               <div class="pm-product-info">
                 <strong class="pm-product-name">{{ productLabel }}</strong>
-                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Qtd: {{ quantity }}</span>
+                <span class="pm-product-qty">Tamanho: {{ selectedSizeLabel }} · Quantidade: {{ quantity }}</span>
+                <div class="pm-product-total-row">
+                  <span class="pm-product-total-label">Total:</span>
+                  <span class="pm-product-final">{{ finalAmount }}</span>
+                </div>
               </div>
               <div class="pm-product-price-wrap">
                 <div class="pm-product-total">{{ totalAmount }}</div>
                 <div class="pm-product-shipping" v-if="shippingPriceLabel">{{ shippingPriceLabel }}</div>
-                <div class="pm-product-divider"></div>
-                <div class="pm-product-final">Total: {{ finalAmount }}</div>
               </div>
             </div>
 
             <div class="pm-methods" v-if="!(method === 'pix' && (isSubmitting || paymentResult))">
-              <button :class="['pm-method', method==='pix' ? 'active' : '']" @click.prevent="selectMethod('pix')">PIX</button>
-              <button :class="['pm-method', method==='credit' ? 'active' : '']" @click.prevent="selectMethod('credit')">Cartão de Crédito</button>
-              <button :class="['pm-method', method==='debit' ? 'active' : '']" @click.prevent="selectMethod('debit')">Débito</button>
+              <button :class="['pm-method', 'pm-method-pix', method==='pix' ? 'active' : '']" @click.prevent="selectMethod('pix')">
+               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M14.4754 1.7678C13.1086 0.400967 10.8925 0.400967 9.52565 1.7678L5.39898 5.89447C6.50441 5.82558 7.63299 6.2135 8.47774 7.05825L11.4703 10.0508C11.7632 10.3437 12.2381 10.3437 12.531 10.0508L15.5235 7.05833C16.3682 6.2136 17.4967 5.82567 18.6021 5.89454L14.4754 1.7678ZM20.4538 7.74617L22.2328 9.52516C23.5943 10.8867 23.5996 13.091 22.2485 14.4591L20.4741 16.2335C19.3025 17.4051 17.403 17.4051 16.2314 16.2335L13.2381 13.2402C12.5547 12.5567 11.4466 12.5567 10.7632 13.2402L7.76977 16.2336C6.5982 17.4052 4.69871 17.4052 3.52713 16.2336L1.74761 14.4541C0.40149 13.0856 0.408385 10.8851 1.76829 9.52516L3.54282 7.75063C4.71554 6.59381 6.60399 6.59872 7.77063 7.76536L10.7632 10.7579C11.4466 11.4413 12.5547 11.4413 13.2381 10.7579L16.2306 7.76543C17.3957 6.60032 19.2807 6.5939 20.4538 7.74617ZM5.39783 18.1045C6.50336 18.1734 7.63206 17.7855 8.47688 16.9407L11.4703 13.9473C11.7632 13.6544 12.2381 13.6544 12.531 13.9473L15.5243 16.9406C16.3691 17.7854 17.4978 18.1733 18.6033 18.1044L14.4754 22.2323C13.1086 23.5991 10.8925 23.5991 9.52565 22.2323L5.39783 18.1045Z"></path></svg>
+                <span>PIX</span>
+              </button>
+              <button :class="['pm-method', 'pm-method-icon', method==='credit' ? 'active' : '']" @click.prevent="selectMethod('credit')">
+                <i class="ri-bank-card-fill"></i>
+                <span>Cartão de Crédito</span>
+              </button>
+              <button :class="['pm-method', 'pm-method-icon', method==='debit' ? 'active' : '']" @click.prevent="selectMethod('debit')">
+                <i class="ri-bank-card-2-fill"></i>
+                <span>Cartão de Débito</span>
+              </button>
             </div>
           </div>
 
@@ -370,7 +602,12 @@ export default {
             <div class="pm-method-panel">
               <template v-if="method==='pix'">
                 <div class="pm-pix">
-                  <div v-if="isSubmitting" class="pm-loader">
+                  <div v-if="isLoadingAddress" class="pm-loader">
+                    <div class="pm-loader-spinner"></div>
+                    <p>Processando informações</p>
+                  </div>
+
+                  <div v-else-if="isSubmitting" class="pm-loader">
                     <div class="pm-loader-spinner"></div>
                     <p>{{ loadingMessage }}</p>
                   </div>
@@ -425,7 +662,15 @@ export default {
 
                     <label class="pm-field">
                       <span>CPF</span>
-                      <input type="text" v-model="pixForm.cpf" :disabled="isSubmitting" inputmode="numeric" placeholder="000.000.000-00" />
+                      <input
+                        type="text"
+                        v-model="pixForm.cpf"
+                        :disabled="isSubmitting"
+                        inputmode="numeric"
+                        placeholder="000.000.000-00"
+                        @input="pixForm.cpf = formatCpf(pixForm.cpf)"
+                      />
+                      <small class="pm-helper-text">Formatação automática. Digite apenas números.</small>
                     </label>
 
                     <label class="pm-field">
@@ -441,11 +686,18 @@ export default {
                     <div class="pm-row">
                       <label class="pm-field small">
                         <span>CEP</span>
-                        <input type="text" v-model="pixForm.cep" :disabled="isSubmitting" inputmode="numeric" placeholder="00000-000" />
+                        <input
+                          type="text"
+                          v-model="pixForm.cep"
+                          :disabled="isSubmitting"
+                          inputmode="numeric"
+                          placeholder="00000-000"
+                          @input="pixForm.cep = formatCep(pixForm.cep)"
+                        />
                       </label>
                       <label class="pm-field small">
                         <span>Número</span>
-                        <input type="text" v-model="pixForm.number" :disabled="isSubmitting" placeholder="123" />
+                        <input type="text" v-model="pixForm.number" :disabled="isSubmitting" placeholder="Exemplo: 123" />
                       </label>
                     </div>
 
@@ -467,15 +719,16 @@ export default {
                 </div>
               </template>
 
-              <template v-else>
-                <form class="pm-card-form" @submit.prevent="confirm">
+              <template v-else-if="method==='credit'">
+                <form class="pm-card-form pm-pix-form" @submit.prevent="confirm">
+                  <p class="pm-note">Preencha seus dados para concluir o pagamento com cartão de crédito.</p>
                   <label class="pm-field">
                     <span>Número do cartão</span>
                     <input type="text" v-model="card.number" @input="formatCardNumber" inputmode="numeric" placeholder="0000 0000 0000 0000" />
                   </label>
                   <label class="pm-field">
                     <span>Nome no cartão</span>
-                    <input type="text" v-model="card.name" placeholder="Nome impresso no cartão" />
+                    <input type="text" v-model="card.name" placeholder="Ex. MARIA JOSE" />
                   </label>
                   <div class="pm-row">
                     <label class="pm-field small">
@@ -484,9 +737,169 @@ export default {
                     </label>
                     <label class="pm-field small">
                       <span>CVV</span>
-                      <input type="password" v-model="card.cvv" inputmode="numeric" placeholder="123" />
+                      <input type="text" v-model="card.cvv" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123" />
                     </label>
                   </div>
+
+                  <label class="pm-field">
+                    <span>Quantidade de parcelas</span>
+                    <select v-model.number="cardInstallments" :disabled="isSubmitting">
+                      <option v-if="isLoadingCardInstallments" disabled value="">
+                        Consultando condições...
+                      </option>
+                      <option v-else-if="cardInstallmentOptions.length === 0" disabled value="">
+                        Digite os 6 primeiros números do cartão
+                      </option>
+                      <option v-for="option in cardInstallmentOptions" :key="option.installments" :value="option.installments">
+                        {{ option.installments }}x {{ option.installments <= sellerInterestFreeInstallments ? 'sem juros' : 'com juros' }} ({{ formatCurrency(option.installmentAmount) }})
+                      </option>
+                    </select>
+                    <small v-if="cardInstallmentsError" class="pm-helper-text">{{ cardInstallmentsError }}</small>
+                  </label>
+
+                  <label class="pm-field">
+                    <span>Nome completo</span>
+                    <input type="text" v-model="pixForm.fullName" :disabled="isSubmitting" placeholder="Seu nome completo" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>CPF</span>
+                    <input
+                      type="text"
+                      v-model="pixForm.cpf"
+                      :disabled="isSubmitting"
+                      inputmode="numeric"
+                      placeholder="000.000.000-00"
+                      @input="pixForm.cpf = formatCpf(pixForm.cpf)"
+                    />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>E-mail</span>
+                    <input type="email" v-model="pixForm.email" :disabled="isSubmitting" placeholder="seu@email.com" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>Telefone</span>
+                    <input type="tel" v-model="pixForm.phone" :disabled="isSubmitting" inputmode="tel" placeholder="(00) 90000-0000" />
+                  </label>
+
+                  <div class="pm-row">
+                    <label class="pm-field small">
+                      <span>CEP</span>
+                      <input
+                        type="text"
+                        v-model="pixForm.cep"
+                        :disabled="isSubmitting"
+                        inputmode="numeric"
+                        placeholder="00000-000"
+                        @input="pixForm.cep = formatCep(pixForm.cep)"
+                      />
+                    </label>
+                    <label class="pm-field small">
+                      <span>Número</span>
+                      <input type="text" v-model="pixForm.number" :disabled="isSubmitting" placeholder="Exemplo: 123" />
+                    </label>
+                  </div>
+
+                  <label class="pm-field">
+                    <span>Rua / Av.</span>
+                    <input type="text" v-model="pixForm.street" :disabled="isSubmitting" placeholder="Ex. Av. Brasil" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>Bairro</span>
+                    <input type="text" v-model="pixForm.neighborhood" :disabled="isSubmitting" placeholder="Ex. Jardim América" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>Complemento <i style="font-size: 0.8em; color: #999;">(opcional)</i></span>
+                    <input type="text" v-model="pixForm.complement" :disabled="isSubmitting" placeholder="Ex. Apto 101, Bloco A" />
+                  </label>
+                </form>
+              </template>
+
+              <template v-else>
+                <form class="pm-card-form pm-pix-form" @submit.prevent="confirm">
+                  <p class="pm-note">Preencha seus dados para concluir o pagamento com cartão de débito.</p>
+                  <label class="pm-field">
+                    <span>Número do cartão</span>
+                    <input type="text" v-model="card.number" @input="formatCardNumber" inputmode="numeric" placeholder="0000 0000 0000 0000" />
+                  </label>
+                  <label class="pm-field">
+                    <span>Nome no cartão</span>
+                    <input type="text" v-model="card.name" placeholder="Ex. MARIA JOSE" />
+                  </label>
+                  <div class="pm-row">
+                    <label class="pm-field small">
+                      <span>Validade</span>
+                      <input type="text" v-model="card.expiry" placeholder="MM/AA" />
+                    </label>
+                    <label class="pm-field small">
+                      <span>CVV</span>
+                      <input type="text" v-model="card.cvv" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123" />
+                    </label>
+                  </div>
+
+                  <label class="pm-field">
+                    <span>Nome completo</span>
+                    <input type="text" v-model="pixForm.fullName" :disabled="isSubmitting" placeholder="Seu nome completo" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>CPF</span>
+                    <input
+                      type="text"
+                      v-model="pixForm.cpf"
+                      :disabled="isSubmitting"
+                      inputmode="numeric"
+                      placeholder="000.000.000-00"
+                      @input="pixForm.cpf = formatCpf(pixForm.cpf)"
+                    />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>E-mail</span>
+                    <input type="email" v-model="pixForm.email" :disabled="isSubmitting" placeholder="seu@email.com" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>Telefone</span>
+                    <input type="tel" v-model="pixForm.phone" :disabled="isSubmitting" inputmode="tel" placeholder="(00) 90000-0000" />
+                  </label>
+
+                  <div class="pm-row">
+                    <label class="pm-field small">
+                      <span>CEP</span>
+                      <input
+                        type="text"
+                        v-model="pixForm.cep"
+                        :disabled="isSubmitting"
+                        inputmode="numeric"
+                        placeholder="00000-000"
+                        @input="pixForm.cep = formatCep(pixForm.cep)"
+                      />
+                    </label>
+                    <label class="pm-field small">
+                      <span>Número</span>
+                      <input type="text" v-model="pixForm.number" :disabled="isSubmitting" placeholder="Exemplo: 123" />
+                    </label>
+                  </div>
+
+                  <label class="pm-field">
+                    <span>Rua / Av.</span>
+                    <input type="text" v-model="pixForm.street" :disabled="isSubmitting" placeholder="Ex. Av. Brasil" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>Bairro</span>
+                    <input type="text" v-model="pixForm.neighborhood" :disabled="isSubmitting" placeholder="Ex. Jardim América" />
+                  </label>
+
+                  <label class="pm-field">
+                    <span>Complemento <i style="font-size: 0.8em; color: #999;">(opcional)</i></span>
+                    <input type="text" v-model="pixForm.complement" :disabled="isSubmitting" placeholder="Ex. Apto 101, Bloco A" />
+                  </label>
                 </form>
               </template>
             </div>
