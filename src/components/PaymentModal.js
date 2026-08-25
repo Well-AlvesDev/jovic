@@ -437,6 +437,93 @@ export default {
         currency: 'BRL',
       });
     },
+    async tokenizeCard() {
+      const publicKey = String(SUPABASE_CONFIG.mercadoPagoPublicKey || '').trim();
+      if (!publicKey) {
+        throw new Error('Configure a chave pública do Mercado Pago antes de testar o pagamento.');
+      }
+      if (!window.MercadoPago) {
+        throw new Error('SDK do Mercado Pago não carregado. Recarregue a página e tente novamente.');
+      }
+
+      const mercadoPago = new window.MercadoPago(publicKey, { locale: 'pt-BR' });
+      const cardNumber = String(this.card.number).replace(/\D/g, '');
+      const expiry = String(this.card.expiry).replace(/\D/g, '');
+      const [month = '', year = ''] = [expiry.slice(0, 2), expiry.slice(2, 4)];
+      if (month.length !== 2 || year.length !== 2) {
+        throw new Error('Informe a validade do cartão no formato MM/AA.');
+      }
+
+      const token = await mercadoPago.createCardToken({
+        cardNumber,
+        cardholderName: String(this.card.name).trim(),
+        cardExpirationMonth: month,
+        cardExpirationYear: `20${year}`,
+        securityCode: String(this.card.cvv).replace(/\D/g, ''),
+        identificationType: 'CPF',
+        identificationNumber: this.sanitizeCpf(this.pixForm.cpf),
+      });
+      if (!token?.id) throw new Error('Não foi possível tokenizar o cartão.');
+
+      const methodsResponse = await mercadoPago.getPaymentMethods({ bin: cardNumber.slice(0, 6) });
+      const methods = Array.isArray(methodsResponse)
+        ? methodsResponse
+        : (Array.isArray(methodsResponse?.results) ? methodsResponse.results : []);
+      const expectedType = this.method === 'credit' ? 'credit_card' : 'debit_card';
+      const paymentMethod = methods.find((method) => method?.payment_type_id === expectedType);
+      const paymentMethodId = paymentMethod?.id || paymentMethod?.payment_method_id;
+      if (!paymentMethodId) {
+        throw new Error(`O SDK não encontrou uma bandeira de ${this.method === 'credit' ? 'crédito' : 'débito'} para este cartão.`);
+      }
+
+      return { tokenId: token.id, paymentMethodId, issuerId: paymentMethod.issuer?.id || null };
+    },
+    async submitCardPayment() {
+      const customer = {
+        ...this.pixForm,
+        cpf: this.sanitizeCpf(this.pixForm.cpf),
+        phone: String(this.pixForm.phone || '').replace(/\D/g, ''),
+        cep: String(this.pixForm.cep || '').replace(/\D/g, ''),
+        number: String(this.pixForm.number || '').trim(),
+      };
+      this.isSubmitting = true;
+      this.loadingMessage = 'Protegendo o cartão e processando pagamento...';
+
+      try {
+        const cardData = await this.tokenizeCard();
+        const response = await fetch(SUPABASE_CONFIG.cardCheckoutUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_CONFIG.anonKey,
+          },
+          body: JSON.stringify({
+            productId: Number(this.product.ID),
+            quantity: Number(this.quantity || 1),
+            size: String(this.selectedSize),
+            shippingService: String(this.selectedShipping.service),
+            shippingCep: customer.cep,
+            cardToken: cardData.tokenId,
+            paymentMethodId: cardData.paymentMethodId,
+            issuerId: cardData.issuerId,
+            installments: this.method === 'credit' ? normalizeCardInstallments(this.cardInstallments) : 1,
+            customer,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || data?.ok === false) {
+          throw new Error(data?.error || `Não foi possível processar o pagamento. Status ${response.status}.`);
+        }
+        this.paymentResult = data;
+        this.paymentStatus = data?.status || 'pending';
+        this.loadingMessage = data?.status === 'approved' ? 'Pagamento concluído' : 'Pagamento em análise';
+        this.$emit('confirm', { method: data.paymentType || this.method, customer, payment: data });
+      } catch (error) {
+        alert(error.message || 'Erro ao processar o pagamento.');
+      } finally {
+        this.isSubmitting = false;
+      }
+    },
     async confirm() {
       if (this.method === 'pix') {
         if (!this.validatePixForm()) return;
@@ -528,27 +615,7 @@ export default {
       if (this.method === 'credit' && !this.validateCardInstallments()) return;
 
       if ((this.method === 'credit' || this.method === 'debit') && this.cardValid) {
-        const customer = {
-          ...this.pixForm,
-          cpf: this.sanitizeCpf(this.pixForm.cpf),
-          phone: String(this.pixForm.phone || '').replace(/\D/g, ''),
-          cep: String(this.pixForm.cep || '').replace(/\D/g, ''),
-          number: String(this.pixForm.number || '').trim(),
-        };
-        this.$emit('confirm', {
-          method: this.method,
-          card: { ...this.card },
-          installments: this.method === 'credit' ? normalizeCardInstallments(this.cardInstallments) : 1,
-          installmentAmount: this.method === 'credit'
-            ? this.cardInstallmentOptions.find((option) => option.installments === normalizeCardInstallments(this.cardInstallments))?.installmentAmount ?? null
-            : null,
-          interestPayer: this.method === 'credit' ? getCardInterestPayer(this.cardInstallments) : null,
-          interestFree: this.method === 'credit' && normalizeCardInstallments(this.cardInstallments) <= SELLER_INTEREST_FREE_INSTALLMENTS,
-          customer,
-          product: this.product,
-          quantity: this.quantity,
-          size: this.selectedSize,
-        });
+        await this.submitCardPayment();
         return;
       }
       alert('Preencha os dados de pagamento corretamente.');
