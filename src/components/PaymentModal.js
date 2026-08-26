@@ -480,29 +480,11 @@ export default {
 
       const bin = cardNumber.slice(0, 6);
       const methodsResponse = await mercadoPago.getPaymentMethods({ bin });
-      let methods = Array.isArray(methodsResponse)
+      const methods = Array.isArray(methodsResponse)
         ? methodsResponse
         : (Array.isArray(methodsResponse?.results) ? methodsResponse.results : []);
       const expectedType = this.method === 'credit' ? 'credit_card' : 'debit_card';
-      let paymentMethod = methods.find((method) => method?.payment_type_id === expectedType);
-
-      // Alguns ambientes do SDK retornam uma lista incompleta; a consulta pública
-      // por BIN é a mesma fonte oficial e não expõe os dados completos do cartão.
-      if (!paymentMethod) {
-        const publicMethodsUrl = new URL('https://api.mercadopago.com/v1/payment_methods');
-        publicMethodsUrl.searchParams.set('public_key', publicKey);
-        publicMethodsUrl.searchParams.set('bin', bin);
-        const publicMethodsResponse = await fetch(publicMethodsUrl);
-        if (publicMethodsResponse.ok) {
-          const publicMethodsData = await publicMethodsResponse.json();
-          const publicMethods = Array.isArray(publicMethodsData)
-            ? publicMethodsData
-            : (Array.isArray(publicMethodsData?.results) ? publicMethodsData.results : []);
-          methods = [...methods, ...publicMethods];
-          paymentMethod = publicMethods.find((method) => method?.payment_type_id === expectedType);
-        }
-      }
-
+      const paymentMethod = methods.find((method) => method?.payment_type_id === expectedType);
       const paymentMethodId = paymentMethod?.id || paymentMethod?.payment_method_id;
       if (!paymentMethodId) {
         const returnedTypes = [...new Set(methods
