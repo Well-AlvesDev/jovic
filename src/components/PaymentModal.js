@@ -102,16 +102,24 @@ export function getPaymentMethodSelectionError(selectedMethod = '', methods = []
 
   if (!returnedTypes.length) return null;
 
-  const supportsSelectedType = returnedTypes.includes(
-    method === 'credit' ? 'credit_card' : method === 'debit' ? 'debit_card' : null
-  );
+  const expectedType = method === 'credit' ? 'credit_card' : method === 'debit' ? 'debit_card' : null;
+  if (!expectedType) return null;
 
+  const supportsSelectedType = returnedTypes.includes(expectedType);
   if (supportsSelectedType) return null;
 
-  const supportsAnyCardType = returnedTypes.some((type) => type === 'credit_card' || type === 'debit_card');
-  if (supportsAnyCardType) return null;
+  // O BIN existe no Mercado Pago mas não oferece o tipo que o usuário
+  // selecionou (ex.: cartão só de crédito e o usuário marcou débito).
+  // Isso é um erro real, não um "tanto faz" — nunca deve cair para o outro tipo.
+  const otherTypeLabel = expectedType === 'credit_card' ? 'débito' : 'crédito';
+  const requestedTypeLabel = expectedType === 'credit_card' ? 'crédito' : 'débito';
+  const supportsOtherType = returnedTypes.includes(expectedType === 'credit_card' ? 'debit_card' : 'credit_card');
 
-  return null;
+  if (supportsOtherType) {
+    return `Este cartão não possui a opção de ${requestedTypeLabel} habilitada. Ele suporta apenas ${otherTypeLabel}.`;
+  }
+
+  return `Este cartão não possui a opção de ${requestedTypeLabel} disponível para pagamento.`;
 }
 
 export default {
@@ -513,9 +521,13 @@ export default {
         throw new Error(selectionError);
       }
 
+      // IMPORTANTE: cartões de uso dual (ex.: Nubank) retornam o mesmo BIN para
+      // crédito e débito. Por isso NUNCA usamos fallback para "qualquer tipo
+      // disponível" aqui — isso é o que causava cobrar como crédito um pagamento
+      // que o usuário escolheu como débito. Se o tipo pedido não existir para
+      // este BIN, é erro, não substituição silenciosa.
       const expectedType = this.method === 'credit' ? 'credit_card' : 'debit_card';
-      let paymentMethod = methods.find((method) => method?.payment_type_id === expectedType)
-        || methods.find((method) => method?.payment_type_id === 'credit_card' || method?.payment_type_id === 'debit_card');
+      const paymentMethod = methods.find((method) => method?.payment_type_id === expectedType);
       const paymentMethodId = paymentMethod?.id || paymentMethod?.payment_method_id;
       if (!paymentMethodId) {
         const returnedTypes = [...new Set(methods
@@ -526,7 +538,7 @@ export default {
           type: method?.payment_type_id,
           name: method?.name,
         })));
-        throw new Error(`O Mercado Pago não retornou uma opção de ${this.method === 'credit' ? 'crédito' : 'débito'} para este BIN. Tipos retornados: ${returnedTypes}.`);
+        throw new Error(`Este cartão não possui opção de ${this.method === 'credit' ? 'crédito' : 'débito'} disponível. Tipos suportados por este cartão: ${returnedTypes}.`);
       }
 
       return {
