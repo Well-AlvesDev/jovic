@@ -20,7 +20,7 @@ export default {
         <!-- Menu toggle (esquerda) -->
         <button class="menu-toggle" aria-label="Menu" @click="toggleMenu">
           <i class="ri-menu-line"></i>
-          <span class="menu-label">menu v1.3</span>
+          <span class="menu-label">menu v1.4</span>
         </button>
 
         <!-- Centro: logo sticky ou nome da loja -->
