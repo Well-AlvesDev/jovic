@@ -391,6 +391,157 @@
     flex-wrap: wrap;
 }
 
+.pm-approved {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 4px 28px;
+    text-align: center;
+}
+
+.pm-approved-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    margin: 4px 0 8px;
+    border-radius: 50%;
+    background: #e9fbf2;
+    color: #08b875;
+    animation: pm-approved-pop 0.65s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.pm-approved-icon::before {
+    position: absolute;
+    width: 88px;
+    height: 88px;
+    border: 1px solid rgba(8, 184, 117, 0.25);
+    border-radius: 50%;
+    content: '';
+    animation: pm-approved-ring 1.4s ease-out 0.35s both;
+}
+
+.pm-approved-icon i {
+    font-size: 38px;
+    animation: pm-approved-check 0.4s ease-out 0.35s both;
+}
+
+.pm-approved-kicker {
+    margin: 4px 0 0;
+    color: #08a96d;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.pm-approved h4 {
+    margin: 0;
+    color: #171717;
+    font-size: 21px;
+    line-height: 1.2;
+}
+
+.pm-approved-subtitle {
+    margin: 0 0 12px;
+    color: #686868;
+    font-size: 13px;
+}
+
+.pm-approved-details {
+    width: 100%;
+    max-width: 440px;
+    padding: 4px 16px;
+    border: 1px solid #e9eceb;
+    border-radius: 14px;
+    background: #fff;
+    text-align: left;
+}
+
+.pm-approved-details div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 11px 0;
+    border-bottom: 1px solid #f0f2f1;
+}
+
+.pm-approved-details div:last-child {
+    border-bottom: 0;
+}
+
+.pm-approved-details span {
+    color: #777;
+    font-size: 12px;
+}
+
+.pm-approved-details strong {
+    max-width: 58%;
+    overflow: hidden;
+    color: #222;
+    font-size: 12px;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pm-receipt-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 440px;
+    margin-top: 8px;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 8px;
+    background: #08b875;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+@keyframes pm-approved-pop {
+    0% {
+        opacity: 0;
+        transform: scale(0.55);
+    }
+
+    70% {
+        transform: scale(1.08);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes pm-approved-check {
+    from {
+        opacity: 0;
+        transform: scale(0.4) rotate(-25deg);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) rotate(0);
+    }
+}
+
+@keyframes pm-approved-ring {
+    0% {
+        opacity: 0.8;
+        transform: scale(0.7);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(1.35);
+    }
+}
+
 /* Desktop tweaks */
 @media(min-width:720px) {
     .payment-modal-overlay {
