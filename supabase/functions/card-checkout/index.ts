@@ -214,6 +214,7 @@ Deno.serve(async (request) => {
     const cep = String(payload?.shippingCep ?? payload?.customer?.cep ?? '').replace(/\D/g, '');
     const cardToken = String(payload?.cardToken ?? '').trim();
     const paymentMethodId = String(payload?.paymentMethodId ?? '').trim();
+    const requestedPaymentType = String(payload?.requestedPaymentType ?? '').trim().toLowerCase();
     const installments = Number.parseInt(payload?.installments ?? '1', 10);
     const customer = payload?.customer ?? {};
 
@@ -242,6 +243,12 @@ Deno.serve(async (request) => {
     }
 
     const paymentType = await detectPaymentType(paymentMethodId);
+    if (requestedPaymentType && requestedPaymentType !== paymentType) {
+      return jsonResponse(request, {
+        ok: false,
+        error: `O cartão foi identificado como ${paymentType === 'credit' ? 'crédito' : 'débito'}, mas a opção selecionada foi ${requestedPaymentType === 'credit' ? 'crédito' : 'débito'}.`,
+      }, 422);
+    }
     if (paymentType === 'debit' && installments !== 1) {
       return jsonResponse(request, { ok: false, error: 'Cartão de débito deve ser pago à vista.' }, 400);
     }
