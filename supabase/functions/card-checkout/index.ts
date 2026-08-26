@@ -170,6 +170,28 @@ async function detectPaymentType(paymentMethodId: string): Promise<'credit' | 'd
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return jsonResponse(request, { ok: true });
+  if (request.method === 'GET') {
+    const paymentId = new URL(request.url).searchParams.get('paymentId');
+    if (!paymentId) return jsonResponse(request, { ok: false, error: 'paymentId obrigatório.' }, 400);
+
+    try {
+      const response = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+        headers: { Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}` },
+      });
+      if (!response.ok) return jsonResponse(request, { ok: false, error: 'Não foi possível consultar o pagamento.' }, 502);
+      const payment = await response.json();
+      return jsonResponse(request, {
+        ok: true,
+        paymentId: payment?.id ?? paymentId,
+        status: payment?.status ?? 'pending',
+        statusDetail: payment?.status_detail ?? null,
+        transactionAmount: payment?.transaction_amount ?? null,
+      });
+    } catch (error) {
+      console.error('Erro ao consultar pagamento de cartão:', error);
+      return jsonResponse(request, { ok: false, error: 'Erro ao consultar o pagamento.' }, 500);
+    }
+  }
   if (request.method !== 'POST') return jsonResponse(request, { ok: false, error: 'Método não permitido.' }, 405);
 
   try {
@@ -258,8 +280,21 @@ Deno.serve(async (request) => {
     });
 
     if (!mpResponse.ok) {
-      console.error('Mercado Pago recusou o pagamento:', mpResponse.status, await mpResponse.text());
-      return jsonResponse(request, { ok: false, error: 'Erro ao processar o pagamento no Mercado Pago.' }, 502);
+      const errorText = await mpResponse.text();
+      let errorData: { message?: string; error?: string; cause?: Array<{ code?: string; description?: string }> } = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      console.error('Mercado Pago recusou o pagamento:', mpResponse.status, errorData);
+      const cause = Array.isArray(errorData.cause) ? errorData.cause[0] : null;
+      return jsonResponse(request, {
+        ok: false,
+        error: cause?.description || errorData.message || errorData.error || 'Erro ao processar o pagamento no Mercado Pago.',
+        paymentStatus: mpResponse.status,
+        causeCode: cause?.code || null,
+      }, 502);
     }
     const payment = await mpResponse.json();
     return jsonResponse(request, {

@@ -177,6 +177,15 @@ export default {
       if (this.isSubmitting) return 'Gerando QR Code...';
       return 'Confirmar';
     },
+    paymentMethodLabel() {
+      if (this.paymentResult?.paymentType === 'credit' || this.method === 'credit') return 'Cartão de crédito';
+      if (this.paymentResult?.paymentType === 'debit' || this.method === 'debit') return 'Cartão de débito';
+      return 'PIX';
+    },
+    approvedAmount() {
+      const amount = this.paymentResult?.amounts?.total ?? this.paymentResult?.amount ?? this.paymentResult?.transaction_amount;
+      return this.formatCurrency(amount);
+    },
   },
   watch: {
     show(newVal) {
@@ -229,7 +238,8 @@ export default {
       if (!paymentId) return;
 
       try {
-        const response = await fetch(`${SUPABASE_CONFIG.pixCheckoutUrl}?paymentId=${encodeURIComponent(paymentId)}`, {
+        const statusUrl = this.method === 'pix' ? SUPABASE_CONFIG.pixCheckoutUrl : SUPABASE_CONFIG.cardCheckoutUrl;
+        const response = await fetch(`${statusUrl}?paymentId=${encodeURIComponent(paymentId)}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -437,6 +447,9 @@ export default {
         currency: 'BRL',
       });
     },
+    downloadReceipt() {
+      window.print();
+    },
     async tokenizeCard() {
       const publicKey = String(SUPABASE_CONFIG.mercadoPagoPublicKey || '').trim();
       if (!publicKey) {
@@ -510,16 +523,33 @@ export default {
             customer,
           }),
         });
-        const data = await response.json();
-        if (!response.ok || data?.ok === false) {
-          throw new Error(data?.error || `Não foi possível processar o pagamento. Status ${response.status}.`);
+        const responseText = await response.text();
+        let data = null;
+        try {
+          data = responseText ? JSON.parse(responseText) : null;
+        } catch {
+          throw new Error(`Resposta inválida do checkout (HTTP ${response.status}).`);
         }
+        if (!response.ok || data?.ok === false) {
+          throw new Error(data?.error || `O checkout recusou o pagamento (HTTP ${response.status}).`);
+        }
+        if (!data) throw new Error(`O checkout não retornou dados (HTTP ${response.status}).`);
+        const returnedStatus = String(data?.status || '').trim().toLowerCase();
+        console.info('Resposta do checkout de cartão:', {
+          paymentId: data?.paymentId,
+          status: returnedStatus || 'ausente',
+          paymentType: data?.paymentType,
+        });
         this.paymentResult = data;
-        this.paymentStatus = data?.status || 'pending';
-        this.loadingMessage = data?.status === 'approved' ? 'Pagamento concluído' : 'Pagamento em análise';
+        this.paymentStatus = returnedStatus || 'pending';
+        this.loadingMessage = returnedStatus === 'approved' ? 'Pagamento concluído' : 'Pagamento em análise';
+        if (data?.paymentId && returnedStatus !== 'approved') {
+          this.startPaymentStatusPolling(data.paymentId);
+        }
         this.$emit('confirm', { method: data.paymentType || this.method, customer, payment: data });
       } catch (error) {
-        alert(error.message || 'Erro ao processar o pagamento.');
+        console.error('Falha no pagamento com cartão:', error);
+        alert(error?.message || 'Erro ao processar o pagamento.');
       } finally {
         this.isSubmitting = false;
       }
@@ -649,7 +679,7 @@ export default {
               </div>
             </div>
 
-            <div class="pm-methods" v-if="!(method === 'pix' && (isSubmitting || paymentResult))">
+            <div class="pm-methods" v-if="!(isSubmitting || paymentStatus === 'approved' || (method === 'pix' && paymentResult))">
               <button :class="['pm-method', 'pm-method-pix', method==='pix' ? 'active' : '']" @click.prevent="selectMethod('pix')">
                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M14.4754 1.7678C13.1086 0.400967 10.8925 0.400967 9.52565 1.7678L5.39898 5.89447C6.50441 5.82558 7.63299 6.2135 8.47774 7.05825L11.4703 10.0508C11.7632 10.3437 12.2381 10.3437 12.531 10.0508L15.5235 7.05833C16.3682 6.2136 17.4967 5.82567 18.6021 5.89454L14.4754 1.7678ZM20.4538 7.74617L22.2328 9.52516C23.5943 10.8867 23.5996 13.091 22.2485 14.4591L20.4741 16.2335C19.3025 17.4051 17.403 17.4051 16.2314 16.2335L13.2381 13.2402C12.5547 12.5567 11.4466 12.5567 10.7632 13.2402L7.76977 16.2336C6.5982 17.4052 4.69871 17.4052 3.52713 16.2336L1.74761 14.4541C0.40149 13.0856 0.408385 10.8851 1.76829 9.52516L3.54282 7.75063C4.71554 6.59381 6.60399 6.59872 7.77063 7.76536L10.7632 10.7579C11.4466 11.4413 12.5547 11.4413 13.2381 10.7579L16.2306 7.76543C17.3957 6.60032 19.2807 6.5939 20.4538 7.74617ZM5.39783 18.1045C6.50336 18.1734 7.63206 17.7855 8.47688 16.9407L11.4703 13.9473C11.7632 13.6544 12.2381 13.6544 12.531 13.9473L15.5243 16.9406C16.3691 17.7854 17.4978 18.1733 18.6033 18.1044L14.4754 22.2323C13.1086 23.5991 10.8925 23.5991 9.52565 22.2323L5.39783 18.1045Z"></path></svg>
                 <span>PIX</span>
@@ -667,7 +697,42 @@ export default {
 
           <div class="pm-scrollable">
             <div class="pm-method-panel">
-              <template v-if="method==='pix'">
+              <template v-if="paymentStatus === 'approved' && paymentResult">
+                <section class="pm-approved" aria-live="polite">
+                  <div class="pm-approved-icon" aria-hidden="true">
+                    <i class="ri-check-line"></i>
+                  </div>
+                  <p class="pm-approved-kicker">Pagamento aprovado</p>
+                  <h4>Pagamento realizado com sucesso</h4>
+                  <p class="pm-approved-subtitle">Seu pedido foi confirmado com segurança.</p>
+
+                  <div class="pm-approved-details">
+                    <div>
+                      <span>Forma de pagamento</span>
+                      <strong>{{ paymentMethodLabel }}</strong>
+                    </div>
+                    <div>
+                      <span>Valor total</span>
+                      <strong>{{ approvedAmount }}</strong>
+                    </div>
+                    <div v-if="paymentResult.paymentId">
+                      <span>ID da transação</span>
+                      <strong>{{ paymentResult.paymentId }}</strong>
+                    </div>
+                    <div v-if="paymentResult.statusDetail">
+                      <span>Status</span>
+                      <strong>{{ paymentResult.statusDetail }}</strong>
+                    </div>
+                  </div>
+
+                  <button class="pm-receipt-button" type="button" @click.prevent="downloadReceipt">
+                    <i class="ri-download-2-line"></i>
+                    <span>Baixar comprovante</span>
+                  </button>
+                </section>
+              </template>
+
+              <template v-else-if="method==='pix'">
                 <div class="pm-pix">
                   <div v-if="isLoadingAddress" class="pm-loader">
                     <div class="pm-loader-spinner"></div>
@@ -678,17 +743,6 @@ export default {
                     <div class="pm-loader-spinner"></div>
                     <p>{{ loadingMessage }}</p>
                   </div>
-
-                  <template v-else-if="paymentStatus === 'approved' && paymentResult">
-                    <div class="pm-pix-result">
-                      <p class="pm-note">Pagamento confirmado com sucesso!</p>
-                      <div class="pm-success-box">
-                        <i class="ri-check-double-line" style="font-size: 2rem; color: #24b36b;"></i>
-                        <h4 style="margin: 12px 0 8px;">Seu PIX foi aprovado</h4>
-                        <p>Pedido confirmado e o pagamento foi concluído.</p>
-                      </div>
-                    </div>
-                  </template>
 
                   <template v-else-if="paymentResult && (pixQrCode || pixTicketUrl || pixCode)">
                     <div class="pm-pix-result">
@@ -976,7 +1030,7 @@ export default {
         <footer class="payment-modal-footer">
           <button class="pm-cancel" @click.prevent="close">Cancelar</button>
           <button class="pm-confirm" @click.prevent="confirm" :disabled="isSubmitting" v-if="method==='pix' && !paymentResult">{{ pixButtonLabel }}</button>
-          <button class="pm-confirm" @click.prevent="confirm" v-else-if="method!=='pix'">Confirmar</button>
+          <button class="pm-confirm" @click.prevent="confirm" v-else-if="method!=='pix' && !paymentResult">Confirmar</button>
         </footer>
       </div>
     </div>
