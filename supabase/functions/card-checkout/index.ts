@@ -243,12 +243,21 @@ Deno.serve(async (request) => {
     }
 
     const paymentType = await detectPaymentType(paymentMethodId);
+    // O payment_method_id já veio resolvido pelo BIN no frontend, mas cartões de
+    // uso dual (ex.: Nubank) podem ter esse ID resolvendo para crédito mesmo
+    // quando o usuário escolheu débito (ou vice-versa). Antes isso só gerava um
+    // warning e o pagamento seguia com o tipo detectado, cobrando errado.
+    // Agora: se o tipo detectado não bate com o que o usuário pediu, recusamos.
     if (requestedPaymentType && requestedPaymentType !== paymentType) {
-      console.warn('Tipo selecionado e tipo detectado divergentes para o mesmo BIN; aceitando porque o cartão pode ser de uso dual:', {
+      console.error('Tipo de pagamento divergente: usuário pediu um tipo mas o payment_method_id resolve para outro.', {
         requestedPaymentType,
         detectedPaymentType: paymentType,
         paymentMethodId,
       });
+      return jsonResponse(request, {
+        ok: false,
+        error: `O cartão informado não pôde ser processado como ${requestedPaymentType === 'credit' ? 'crédito' : 'débito'}. Verifique se selecionou a opção correta para este cartão e tente novamente.`,
+      }, 422);
     }
     if (paymentType === 'debit' && installments !== 1) {
       return jsonResponse(request, { ok: false, error: 'Cartão de débito deve ser pago à vista.' }, 400);
