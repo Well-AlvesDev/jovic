@@ -482,15 +482,19 @@ export default {
       const methods = Array.isArray(methodsResponse)
         ? methodsResponse
         : (Array.isArray(methodsResponse?.results) ? methodsResponse.results : []);
-      const paymentMethod = methods.find((method) => (
-        method?.payment_type_id === 'credit_card' || method?.payment_type_id === 'debit_card'
-      ));
+      const expectedType = this.method === 'credit' ? 'credit_card' : 'debit_card';
+      const paymentMethod = methods.find((method) => method?.payment_type_id === expectedType);
       const paymentMethodId = paymentMethod?.id || paymentMethod?.payment_method_id;
       if (!paymentMethodId) {
-        throw new Error('O SDK não retornou uma bandeira de cartão para este número. Verifique se a chave pública e o cartão pertencem ao mesmo ambiente (TEST ou produção).');
+        throw new Error(`Este cartão não está habilitado para ${this.method === 'credit' ? 'crédito' : 'débito'}. Use um cartão de teste do mesmo tipo da opção selecionada.`);
       }
 
-      return { tokenId: token.id, paymentMethodId, issuerId: paymentMethod.issuer?.id || null };
+      return {
+        tokenId: token.id,
+        paymentMethodId,
+        issuerId: paymentMethod.issuer?.id || null,
+        requestedPaymentType: this.method,
+      };
     },
     async submitCardPayment() {
       const customer = {
@@ -520,6 +524,7 @@ export default {
             cardToken: cardData.tokenId,
             paymentMethodId: cardData.paymentMethodId,
             issuerId: cardData.issuerId,
+            requestedPaymentType: cardData.requestedPaymentType,
             installments: this.method === 'credit' ? normalizeCardInstallments(this.cardInstallments) : 1,
             customer,
           }),
