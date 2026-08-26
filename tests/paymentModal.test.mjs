@@ -5,6 +5,7 @@ import {
     calculateFinalTotal,
     normalizeCardInstallments,
     getCardInterestPayer,
+    getPaymentMethodSelectionError,
 } from '../src/components/PaymentModal.js';
 
 assert.equal(truncateProductName('Camiseta Premium de Algodão Masculina'), 'Camiseta Premium de Algodão Ma...');
@@ -25,5 +26,9 @@ assert.equal(normalizeCardInstallments(0), 1);
 assert.equal(getCardInterestPayer(3), 'seller');
 assert.equal(getCardInterestPayer(4), 'buyer');
 assert.equal(getCardInterestPayer(6), 'buyer');
+assert.equal(getPaymentMethodSelectionError('debit', [{ payment_type_id: 'credit_card' }]), null);
+assert.equal(getPaymentMethodSelectionError('credit', [{ payment_type_id: 'debit_card' }]), null);
+assert.equal(getPaymentMethodSelectionError('debit', [{ payment_type_id: 'debit_card' }]), null);
+assert.equal(getPaymentMethodSelectionError('credit', [{ payment_type_id: 'credit_card' }]), null);
 
 console.log('payment modal tests passed');

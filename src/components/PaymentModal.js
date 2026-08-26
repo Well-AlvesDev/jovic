@@ -90,6 +90,30 @@ export function getCardInterestPayer(installments = 1) {
     : 'seller';
 }
 
+export function getPaymentMethodSelectionError(selectedMethod = '', methods = []) {
+  const method = String(selectedMethod || '').trim().toLowerCase();
+  const matches = Array.isArray(methods) ? methods : [];
+
+  if (!method || !matches.length) return null;
+
+  const returnedTypes = [...new Set(matches
+    .map((item) => item?.payment_type_id || item?.type || item?.paymentType)
+    .filter(Boolean))];
+
+  if (!returnedTypes.length) return null;
+
+  const supportsSelectedType = returnedTypes.includes(
+    method === 'credit' ? 'credit_card' : method === 'debit' ? 'debit_card' : null
+  );
+
+  if (supportsSelectedType) return null;
+
+  const supportsAnyCardType = returnedTypes.some((type) => type === 'credit_card' || type === 'debit_card');
+  if (supportsAnyCardType) return null;
+
+  return null;
+}
+
 export default {
   name: 'PaymentModal',
   props: {
@@ -483,8 +507,15 @@ export default {
       const methods = Array.isArray(methodsResponse)
         ? methodsResponse
         : (Array.isArray(methodsResponse?.results) ? methodsResponse.results : []);
+
+      const selectionError = getPaymentMethodSelectionError(this.method, methods);
+      if (selectionError) {
+        throw new Error(selectionError);
+      }
+
       const expectedType = this.method === 'credit' ? 'credit_card' : 'debit_card';
-      const paymentMethod = methods.find((method) => method?.payment_type_id === expectedType);
+      let paymentMethod = methods.find((method) => method?.payment_type_id === expectedType)
+        || methods.find((method) => method?.payment_type_id === 'credit_card' || method?.payment_type_id === 'debit_card');
       const paymentMethodId = paymentMethod?.id || paymentMethod?.payment_method_id;
       if (!paymentMethodId) {
         const returnedTypes = [...new Set(methods
