@@ -267,11 +267,10 @@ export default {
       }
     },
     async checkPaymentStatus(paymentId) {
-      if (!paymentId) return;
+      if (!paymentId || this.method !== 'pix') return;
 
       try {
-        const statusUrl = this.method === 'pix' ? SUPABASE_CONFIG.pixCheckoutUrl : SUPABASE_CONFIG.cardCheckoutUrl;
-        const response = await fetch(`${statusUrl}?paymentId=${encodeURIComponent(paymentId)}`, {
+        const response = await fetch(`${SUPABASE_CONFIG.pixCheckoutUrl}?paymentId=${encodeURIComponent(paymentId)}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -549,67 +548,89 @@ export default {
       };
     },
     async submitCardPayment() {
-      const customer = {
-        ...this.pixForm,
-        cpf: this.sanitizeCpf(this.pixForm.cpf),
-        phone: String(this.pixForm.phone || '').replace(/\D/g, ''),
-        cep: String(this.pixForm.cep || '').replace(/\D/g, ''),
-        number: String(this.pixForm.number || '').trim(),
-      };
+      if (this.method !== 'debit') {
+        alert('O checkout com cartão de crédito está temporariamente indisponível.');
+        return;
+      }
+      if (!this.product?.ID) {
+        alert('Produto indisponível para pagamento.');
+        return;
+      }
+      if (!this.selectedSize) {
+        alert('Selecione um tamanho antes de confirmar o débito.');
+        return;
+      }
+      if (!this.selectedShipping || !this.selectedShipping.service) {
+        alert('Selecione PAC ou SEDEX antes de confirmar o débito.');
+        return;
+      }
+
       this.isSubmitting = true;
-      this.loadingMessage = 'Protegendo o cartão e processando pagamento...';
+      this.loadingMessage = 'Validando cartão e processando débito...';
 
       try {
         const cardData = await this.tokenizeCard();
-        const response = await fetch(SUPABASE_CONFIG.cardCheckoutUrl, {
+        const payload = {
+          id: Number(this.product.ID),
+          productId: Number(this.product.ID),
+          quantity: Number(this.quantity || 1),
+          size: String(this.selectedSize),
+          bin: String(this.card.number || '').replace(/\D/g, '').slice(0, 6),
+          token: cardData.tokenId,
+          paymentMethodId: cardData.paymentMethodId,
+          issuerId: cardData.issuerId,
+          shippingPrice: Number(this.selectedShipping.price ?? 0),
+          customer: {
+            ...this.pixForm,
+            cpf: this.sanitizeCpf(this.pixForm.cpf),
+            phone: String(this.pixForm.phone || '').replace(/\D/g, ''),
+            cep: String(this.pixForm.cep || '').replace(/\D/g, ''),
+            number: String(this.pixForm.number || '').trim(),
+          },
+        };
+
+        const response = await fetch(SUPABASE_CONFIG.debitCheckoutUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             apikey: SUPABASE_CONFIG.anonKey,
           },
-          body: JSON.stringify({
-            productId: Number(this.product.ID),
-            quantity: Number(this.quantity || 1),
-            size: String(this.selectedSize),
-            shippingService: String(this.selectedShipping.service),
-            shippingCep: customer.cep,
-            cardToken: cardData.tokenId,
-            paymentMethodId: cardData.paymentMethodId,
-            issuerId: cardData.issuerId,
-            requestedPaymentType: cardData.requestedPaymentType,
-            installments: this.method === 'credit' ? normalizeCardInstallments(this.cardInstallments) : 1,
-            customer,
-          }),
+          body: JSON.stringify(payload),
         });
         const responseText = await response.text();
         let data = null;
         try {
           data = responseText ? JSON.parse(responseText) : null;
-        } catch {
-          throw new Error(`Resposta inválida do checkout (HTTP ${response.status}).`);
+        } catch (error) {
+          data = { error: responseText };
         }
+
         if (!response.ok || data?.ok === false) {
-          throw new Error(data?.error || `O checkout recusou o pagamento (HTTP ${response.status}).`);
+          const details = data?.details && typeof data.details === 'string' ? ` ${data.details}` : '';
+          throw new Error(data?.error ? `${data.error}${details}` : `Não foi possível processar o débito. Status ${response.status}.`);
         }
-        if (!data) throw new Error(`O checkout não retornou dados (HTTP ${response.status}).`);
-        const returnedStatus = String(data?.status || '').trim().toLowerCase();
-        console.info('Resposta do checkout de cartão:', {
-          paymentId: data?.paymentId,
-          status: returnedStatus || 'ausente',
-          paymentType: data?.paymentType,
-        });
+
         this.paymentResult = data;
-        this.paymentStatus = returnedStatus || 'pending';
-        this.loadingMessage = returnedStatus === 'approved' ? 'Pagamento concluído' : 'Pagamento em análise';
-        if (data?.paymentId && returnedStatus !== 'approved') {
-          this.startPaymentStatusPolling(data.paymentId);
-        }
-        this.$emit('confirm', { method: data.paymentType || this.method, customer, payment: data });
-      } catch (error) {
-        console.error('Falha no pagamento com cartão:', error);
-        alert(error?.message || 'Erro ao processar o pagamento.');
-      } finally {
+        this.paymentStatus = data?.status || 'pending';
         this.isSubmitting = false;
+        this.loadingMessage = this.paymentStatus === 'approved'
+          ? 'Pagamento concluído'
+          : 'Pagamento em processamento';
+
+        this.$emit('confirm', {
+          method: 'debit',
+          customer: { ...this.pixForm },
+          product: this.product,
+          quantity: this.quantity,
+          size: this.selectedSize,
+          payment: data,
+          formSnapshot: payload,
+        });
+      } catch (error) {
+        console.error('Erro no checkout de débito:', error);
+        alert(error?.message || String(error) || 'Erro ao processar o débito.');
+        this.isSubmitting = false;
+        this.loadingMessage = 'Falha na validação';
       }
     },
     async confirm() {
