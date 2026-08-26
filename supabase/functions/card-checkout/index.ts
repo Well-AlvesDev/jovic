@@ -244,10 +244,11 @@ Deno.serve(async (request) => {
 
     const paymentType = await detectPaymentType(paymentMethodId);
     if (requestedPaymentType && requestedPaymentType !== paymentType) {
-      return jsonResponse(request, {
-        ok: false,
-        error: `O cartão foi identificado como ${paymentType === 'credit' ? 'crédito' : 'débito'}, mas a opção selecionada foi ${requestedPaymentType === 'credit' ? 'crédito' : 'débito'}.`,
-      }, 422);
+      console.warn('Tipo selecionado e tipo detectado divergentes para o mesmo BIN; aceitando porque o cartão pode ser de uso dual:', {
+        requestedPaymentType,
+        detectedPaymentType: paymentType,
+        paymentMethodId,
+      });
     }
     if (paymentType === 'debit' && installments !== 1) {
       return jsonResponse(request, { ok: false, error: 'Cartão de débito deve ser pago à vista.' }, 400);
