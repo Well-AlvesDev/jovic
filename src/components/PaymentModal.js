@@ -91,35 +91,7 @@ export function getCardInterestPayer(installments = 1) {
 }
 
 export function getPaymentMethodSelectionError(selectedMethod = '', methods = []) {
-  const method = String(selectedMethod || '').trim().toLowerCase();
-  const matches = Array.isArray(methods) ? methods : [];
-
-  if (!method || !matches.length) return null;
-
-  const returnedTypes = [...new Set(matches
-    .map((item) => item?.payment_type_id || item?.type || item?.paymentType)
-    .filter(Boolean))];
-
-  if (!returnedTypes.length) return null;
-
-  const expectedType = method === 'credit' ? 'credit_card' : method === 'debit' ? 'debit_card' : null;
-  if (!expectedType) return null;
-
-  const supportsSelectedType = returnedTypes.includes(expectedType);
-  if (supportsSelectedType) return null;
-
-  // O BIN existe no Mercado Pago mas não oferece o tipo que o usuário
-  // selecionou (ex.: cartão só de crédito e o usuário marcou débito).
-  // Isso é um erro real, não um "tanto faz" — nunca deve cair para o outro tipo.
-  const otherTypeLabel = expectedType === 'credit_card' ? 'débito' : 'crédito';
-  const requestedTypeLabel = expectedType === 'credit_card' ? 'crédito' : 'débito';
-  const supportsOtherType = returnedTypes.includes(expectedType === 'credit_card' ? 'debit_card' : 'credit_card');
-
-  if (supportsOtherType) {
-    return `Este cartão não possui a opção de ${requestedTypeLabel} habilitada. Ele suporta apenas ${otherTypeLabel}.`;
-  }
-
-  return `Este cartão não possui a opção de ${requestedTypeLabel} disponível para pagamento.`;
+  return null;
 }
 
 export default {
@@ -250,9 +222,6 @@ export default {
       }
       this.loadAddressFromCep();
     },
-    'card.number': function () {
-      this.loadCardInstallments();
-    }
   },
   methods: {
     close() {
@@ -311,56 +280,6 @@ export default {
     selectMethod(m) {
       if (this.isSubmitting) return;
       this.method = m;
-    },
-    async loadCardInstallments() {
-      const bin = String(this.card.number || '').replace(/\D/g, '').slice(0, 6);
-
-      if (bin.length === 6 && bin === this.cardInstallmentsBin) return;
-
-      const requestId = ++this.cardInstallmentsRequestId;
-      this.cardInstallmentOptions = [];
-      this.cardInstallments = 1;
-      this.cardInstallmentsError = '';
-
-      if (bin.length !== 6) {
-        this.cardInstallmentsBin = '';
-        this.isLoadingCardInstallments = false;
-        return;
-      }
-
-      this.cardInstallmentsBin = bin;
-      this.isLoadingCardInstallments = true;
-      try {
-        const amount = calculateFinalTotal(this.product, this.quantity, this.selectedShipping).toFixed(2);
-        const response = await fetch(`${SUPABASE_CONFIG.cardInstallmentsUrl}?amount=${encodeURIComponent(amount)}&bin=${encodeURIComponent(bin)}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_CONFIG.anonKey,
-          },
-        });
-        const data = await response.json();
-
-        if (requestId !== this.cardInstallmentsRequestId) return;
-        if (!response.ok || data?.ok === false) {
-          throw new Error(data?.error || 'Não foi possível consultar as parcelas.');
-        }
-
-        this.cardInstallmentOptions = Array.isArray(data?.installments)
-          ? data.installments.filter((option) => option.installments >= 1 && option.installments <= MAX_CARD_INSTALLMENTS)
-          : [];
-        if (this.cardInstallmentOptions.length === 0) {
-          this.cardInstallmentsError = 'Nenhuma opção de parcelamento disponível.';
-        }
-      } catch (error) {
-        if (requestId === this.cardInstallmentsRequestId) {
-          this.cardInstallmentsError = error.message || 'Não foi possível consultar as parcelas.';
-        }
-      } finally {
-        if (requestId === this.cardInstallmentsRequestId) {
-          this.isLoadingCardInstallments = false;
-        }
-      }
     },
     copyPix() {
       const textToCopy = this.pixCode || this.pixTicketUrl || this.pixQrCode;
@@ -481,157 +400,8 @@ export default {
     downloadReceipt() {
       window.print();
     },
-    async tokenizeCard() {
-      const publicKey = String(SUPABASE_CONFIG.mercadoPagoPublicKey || '').trim();
-      if (!publicKey) {
-        throw new Error('Configure a chave pública do Mercado Pago antes de testar o pagamento.');
-      }
-      if (!window.MercadoPago) {
-        throw new Error('SDK do Mercado Pago não carregado. Recarregue a página e tente novamente.');
-      }
-
-      const mercadoPago = new window.MercadoPago(publicKey, { locale: 'pt-BR' });
-      const cardNumber = String(this.card.number).replace(/\D/g, '');
-      const expiry = String(this.card.expiry).replace(/\D/g, '');
-      const [month = '', year = ''] = [expiry.slice(0, 2), expiry.slice(2, 4)];
-      if (month.length !== 2 || year.length !== 2) {
-        throw new Error('Informe a validade do cartão no formato MM/AA.');
-      }
-
-      const token = await mercadoPago.createCardToken({
-        cardNumber,
-        cardholderName: String(this.card.name).trim(),
-        cardExpirationMonth: month,
-        cardExpirationYear: `20${year}`,
-        securityCode: String(this.card.cvv).replace(/\D/g, ''),
-        identificationType: 'CPF',
-        identificationNumber: this.sanitizeCpf(this.pixForm.cpf),
-      });
-      if (!token?.id) throw new Error('Não foi possível tokenizar o cartão.');
-
-      const bin = cardNumber.slice(0, 6);
-      const methodsResponse = await mercadoPago.getPaymentMethods({ bin });
-      const methods = Array.isArray(methodsResponse)
-        ? methodsResponse
-        : (Array.isArray(methodsResponse?.results) ? methodsResponse.results : []);
-
-      const selectionError = getPaymentMethodSelectionError(this.method, methods);
-      if (selectionError) {
-        throw new Error(selectionError);
-      }
-
-      // IMPORTANTE: cartões de uso dual (ex.: Nubank) retornam o mesmo BIN para
-      // crédito e débito. Por isso NUNCA usamos fallback para "qualquer tipo
-      // disponível" aqui — isso é o que causava cobrar como crédito um pagamento
-      // que o usuário escolheu como débito. Se o tipo pedido não existir para
-      // este BIN, é erro, não substituição silenciosa.
-      const expectedType = this.method === 'credit' ? 'credit_card' : 'debit_card';
-      const paymentMethod = methods.find((method) => method?.payment_type_id === expectedType);
-      const paymentMethodId = paymentMethod?.id || paymentMethod?.payment_method_id;
-      if (!paymentMethodId) {
-        const returnedTypes = [...new Set(methods
-          .map((method) => method?.payment_type_id)
-          .filter(Boolean))].join(', ') || 'nenhum';
-        console.warn('Métodos retornados para o BIN:', methods.map((method) => ({
-          id: method?.id || method?.payment_method_id,
-          type: method?.payment_type_id,
-          name: method?.name,
-        })));
-        throw new Error(`Este cartão não possui opção de ${this.method === 'credit' ? 'crédito' : 'débito'} disponível. Tipos suportados por este cartão: ${returnedTypes}.`);
-      }
-
-      return {
-        tokenId: token.id,
-        paymentMethodId,
-        issuerId: paymentMethod.issuer?.id || null,
-        requestedPaymentType: this.method,
-      };
-    },
     async submitCardPayment() {
-      if (this.method !== 'debit') {
-        alert('O checkout com cartão de crédito está temporariamente indisponível.');
-        return;
-      }
-      if (!this.product?.ID) {
-        alert('Produto indisponível para pagamento.');
-        return;
-      }
-      if (!this.selectedSize) {
-        alert('Selecione um tamanho antes de confirmar o débito.');
-        return;
-      }
-      if (!this.selectedShipping || !this.selectedShipping.service) {
-        alert('Selecione PAC ou SEDEX antes de confirmar o débito.');
-        return;
-      }
-
-      this.isSubmitting = true;
-      this.loadingMessage = 'Validando cartão e processando débito...';
-
-      try {
-        const cardData = await this.tokenizeCard();
-        const payload = {
-          id: Number(this.product.ID),
-          productId: Number(this.product.ID),
-          quantity: Number(this.quantity || 1),
-          size: String(this.selectedSize),
-          bin: String(this.card.number || '').replace(/\D/g, '').slice(0, 6),
-          token: cardData.tokenId,
-          paymentMethodId: cardData.paymentMethodId,
-          issuerId: cardData.issuerId,
-          shippingPrice: Number(this.selectedShipping.price ?? 0),
-          customer: {
-            ...this.pixForm,
-            cpf: this.sanitizeCpf(this.pixForm.cpf),
-            phone: String(this.pixForm.phone || '').replace(/\D/g, ''),
-            cep: String(this.pixForm.cep || '').replace(/\D/g, ''),
-            number: String(this.pixForm.number || '').trim(),
-          },
-        };
-
-        const response = await fetch(SUPABASE_CONFIG.debitCheckoutUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_CONFIG.anonKey,
-          },
-          body: JSON.stringify(payload),
-        });
-        const responseText = await response.text();
-        let data = null;
-        try {
-          data = responseText ? JSON.parse(responseText) : null;
-        } catch (error) {
-          data = { error: responseText };
-        }
-
-        if (!response.ok || data?.ok === false) {
-          const details = data?.details && typeof data.details === 'string' ? ` ${data.details}` : '';
-          throw new Error(data?.error ? `${data.error}${details}` : `Não foi possível processar o débito. Status ${response.status}.`);
-        }
-
-        this.paymentResult = data;
-        this.paymentStatus = data?.status || 'pending';
-        this.isSubmitting = false;
-        this.loadingMessage = this.paymentStatus === 'approved'
-          ? 'Pagamento concluído'
-          : 'Pagamento em processamento';
-
-        this.$emit('confirm', {
-          method: 'debit',
-          customer: { ...this.pixForm },
-          product: this.product,
-          quantity: this.quantity,
-          size: this.selectedSize,
-          payment: data,
-          formSnapshot: payload,
-        });
-      } catch (error) {
-        console.error('Erro no checkout de débito:', error);
-        alert(error?.message || String(error) || 'Erro ao processar o débito.');
-        this.isSubmitting = false;
-        this.loadingMessage = 'Falha na validação';
-      }
+      alert('O pagamento com cartão está temporariamente indisponível.');
     },
     async confirm() {
       if (this.method === 'pix') {
@@ -720,8 +490,6 @@ export default {
       }
 
       if ((this.method === 'credit' || this.method === 'debit') && !this.validateCreditCustomerForm()) return;
-
-      if (this.method === 'credit' && !this.validateCardInstallments()) return;
 
       if ((this.method === 'credit' || this.method === 'debit') && this.cardValid) {
         await this.submitCardPayment();
@@ -941,21 +709,7 @@ export default {
                     </label>
                   </div>
 
-                  <label class="pm-field">
-                    <span>Quantidade de parcelas</span>
-                    <select v-model.number="cardInstallments" :disabled="isSubmitting">
-                      <option v-if="isLoadingCardInstallments" disabled value="">
-                        Consultando condições...
-                      </option>
-                      <option v-else-if="cardInstallmentOptions.length === 0" disabled value="">
-                        Digite os 6 primeiros números do cartão
-                      </option>
-                      <option v-for="option in cardInstallmentOptions" :key="option.installments" :value="option.installments">
-                        {{ option.installments }}x {{ option.installments <= sellerInterestFreeInstallments ? 'sem juros' : 'com juros' }} ({{ formatCurrency(option.installmentAmount) }})
-                      </option>
-                    </select>
-                    <small v-if="cardInstallmentsError" class="pm-helper-text">{{ cardInstallmentsError }}</small>
-                  </label>
+                  <p class="pm-helper-text">Parcelamento será disponibilizado na próxima integração.</p>
 
                   <label class="pm-field">
                     <span>Nome completo</span>
